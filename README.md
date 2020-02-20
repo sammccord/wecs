@@ -1,6 +1,6 @@
 # wecs
 
-![](https://img.badgesize.io/ngryman/badge-size/master/dist/index.umd.js.svg)
+![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
 
 > A **wee (small)** Entity Component System for Javascript  
