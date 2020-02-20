@@ -1,6 +1,6 @@
 # wecs
 
-![](https://img.badgesize.io/ngryman/badge-size/master/dist/index.umd.js.svg)
+![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
 
 > A **wee (small)** Entity Component System for Javascript  
@@ -17,6 +17,7 @@
       - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback): void`](#unsubscribecomponents-componentunknown-callback-querycallback-void)
       - [`createEntity(...components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
       - [`addComponent(entity: Entity, ...components: [Component<unknown>, ...any[]][])`](#addcomponententity-entity-components-componentunknown-any)
+      - [`updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`](#updatecomponenttentity-entity-component-updater-component-t--t)
       - [`removeComponent(entity: Entity, ...components: Component<unknown>[])`](#removecomponententity-entity-components-componentunknown)
       - [`async run(...args: any[]): Promise<void>`](#async-runargs-any-promisevoid)
     - [`getComponent<T>(entity: Entity, Component: Component<T>): T`](#getcomponenttentity-entity-component-componentt-t)
@@ -38,20 +39,24 @@ import World, { getComponent } from 'wecs'
 // instantiate the world
 const world = new World()
 
-// create a component, components must have a name property and be newable, so class components also work
+// create a component, components must have a name property and be newable
 function Position(pos) {
   this.pos = pos
   return this
 }
-function Velocity(vel) {
-  this.vel = vel
-  return this
+// so class components also work
+class Velocity {
+  constructor(vel) {
+    this.vel = vel
+  }
 }
 
 // create a system that is called with entities every time world.run is called
 function System(entities) {
   entities.forEach(e => {
-    getComponent(e, Position).pos += getComponent(e, Velocity).vel
+    world.updateComponent(e, Position, c => {
+      c.pos += getComponent(e, Velocity).vel
+    })
   })
 }
 
@@ -100,7 +105,9 @@ function Component() {
 }
 
 function System(entities) {
-  entities.forEach(e => e.Component.foo = 'baz')
+  entities.forEach(e => world.updateComponent(e, Component, c => {
+    c.foo = 'baz'
+  })
 }
 
 world.register(System, Component, OtherComponent, ThirdComponent)
@@ -120,7 +127,7 @@ Subscribe to updates with a callback function that gets executed when:
   * a new entity meeting the component criteria gets created
   * an entity gets a new component that meets the criteria
   * an entity has a component removed that makes it no longer meet the criteria
-  * after the systems run and components are presumably mutated
+  * an entity's component is updated via `world.updateComponent`
 
 The third `emit` argument, when `true`, will immediately call the callback with relevant entities.
 
@@ -196,6 +203,39 @@ world.addComponent(
   [Position, 0, 'foo'],
   [Velocity, 2, 'bar']
 )
+```
+
+#### `updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`
+
+Takes an entity, a component, and a callback function that is called with value of the entity's component.
+
+If the callback returns a value, the entity's component will be set to that value.
+
+Afterwards, trigger all relevant subscriptions
+
+```js
+function Component(multiplier = 2) {
+  this.values = [1, 2, 3].map(v => v * multiplier)
+  return this
+}
+
+const entity = world.createEntity(
+  [Component, 1]
+)
+
+world.updateComponent(entity, Component, c => {
+  // mutate the component directly
+  c.values = []
+}
+
+world.updateComponent(e, Component, c => {
+    // reset the value
+  return new Component(3)
+})
+
+world.subscribe([Component], (entities) => {
+  // this will be called twice
+})
 ```
 
 #### `removeComponent(entity: Entity, ...components: Component<unknown>[])`

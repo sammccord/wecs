@@ -117,6 +117,40 @@ test('removing components works', () => {
 
 })
 
+test('updating components works, and triggers subscriptions', () => {
+  const world = new World()
+
+  function Component(counter) {
+    this.counter = counter
+    return this
+  }
+
+  const System = jest.fn()
+
+  world.register(
+    System,
+    Component,
+  )
+
+  const e = world.createEntity(
+    [Component, 0]
+  )
+
+  const subscription = jest.fn()
+
+  const unsub = world.subscribe([Component], subscription)
+
+  world.updateComponent(e, Component, (c) => {
+    c.counter++
+  })
+
+  expect(getComponent(e, Component).counter).toBe(1)
+  expect(subscription).toHaveBeenCalledTimes(1)
+  expect(subscription).toHaveBeenLastCalledWith([e])
+
+  unsub()
+})
+
 test('you can optionally pass messages to world.run', () => {
   const world = new World()
 
@@ -207,15 +241,11 @@ test('you can subscribe to entity updates', () => {
 
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
-  world.run()
+  world.updateComponent(e1, Component, (c) => c.counter++)
 
-  expect(subscription).toHaveBeenCalledTimes(3)
+  expect(subscription).toHaveBeenCalledTimes(4)
 
   unsub()
-
-  world.run()
-
-  expect(subscription).toHaveBeenCalledTimes(3)
 })
 
 it('the readme example should work', () => {

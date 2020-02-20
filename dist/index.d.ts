@@ -3,7 +3,8 @@ interface ClassComponent<T> {
     new (...args: any): T;
     name: string;
 }
-declare type Component<T> = ClassComponent<T> | Function;
+declare type FunctionComponent<T> = (...args: any[]) => T;
+declare type Component<T> = ClassComponent<T> | FunctionComponent<T>;
 declare type QueryCallback = (...entities: Entity[]) => void;
 interface Config {
     parallel?: boolean;
@@ -26,6 +27,7 @@ export default class World {
     unsubscribe(components: Component<unknown>[], callback: QueryCallback): void;
     createEntity(...components: [Component<unknown>, ...any[]][]): Entity;
     addComponent(entity: Entity, ...components: [Component<unknown>, ...any[]][]): void;
+    updateComponent<T>(entity: Entity, Component: any, updater: (component: T) => T): void;
     removeComponent(entity: Entity, ...components: Component<unknown>[]): void;
     run(...args: any[]): Promise<void>;
 }

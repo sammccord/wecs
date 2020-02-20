@@ -5,7 +5,9 @@ interface ClassComponent<T> {
   name: string
 }
 
-type Component<T> = ClassComponent<T> | Function
+type FunctionComponent<T> = (...args: any[]) => T
+
+type Component<T> = ClassComponent<T> | FunctionComponent<T>
 
 type QueryCallback = (...entities: Entity[]) => void
 
@@ -121,6 +123,15 @@ export default class World {
     })
   }
 
+  public updateComponent<T>(entity: Entity, Component, updater: (component: T) => T): void {
+    entity[Component.name] = updater(entity[Component.name]) || entity[Component.name]
+    Object.values(this._queries).forEach(query => {
+      if (query.entities.includes(entity)) {
+        query.callbacks.forEach(fn => fn(query.entities))
+      }
+    })
+  }
+
   public removeComponent(entity: Entity, ...components: Component<unknown>[]) {
     if (!~components.length) return
     components.forEach(component => {
@@ -143,13 +154,11 @@ export default class World {
       for(let [system, queryKey] of this._systems) {
         if(args) await system(...args, this._queries[queryKey].entities)
         else await system(this._queries[queryKey].entities)
-        this._queries[queryKey].callbacks.forEach(fn => fn(this._queries[queryKey].entities))
       } 
     } else {
       this._systems.forEach(([system, queryKey]) => {
         if(args) system(...args, this._queries[queryKey].entities)
         else system(this._queries[queryKey].entities)
-        this._queries[queryKey].callbacks.forEach(fn => fn(this._queries[queryKey].entities))
       })
     }
     if (this.config.onAfter) await this.config.onAfter(...args)
