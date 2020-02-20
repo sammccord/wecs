@@ -3,7 +3,7 @@
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
 
-> A **wee (small)** Entity Component System for Javascript  
+> A **wee (small)** Entity Component System for Javascript. 0 deps, <1k gzipped
 
 - [wecs](#wecs)
   - [Installation](#installation)
