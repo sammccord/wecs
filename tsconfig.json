@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "lib": ["es2017.object"],
+    "target": "es5",
+    "outDir": "dist",
+    "moduleResolution": "node"
+  },
+  "include": [
+    "./src/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "./src/*.spec.ts"
+  ]
+}
