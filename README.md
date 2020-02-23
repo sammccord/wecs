@@ -42,13 +42,12 @@ import World, { getComponent } from 'wecs'
 // instantiate the world
 const world = new World()
 
-// create a component, components must have a name property and be newable
+// create a component
 class Position {
   constructor(pos) {
     this.pos = pos
   }
 }
-// so class components also work
 class Velocity {
   constructor(vel) {
     this.vel = vel
