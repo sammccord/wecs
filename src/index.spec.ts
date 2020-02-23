@@ -3,9 +3,10 @@ import World, { getComponent, hasComponent } from './index'
 test('basic ecs functionality works', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
@@ -14,11 +15,13 @@ test('basic ecs functionality works', () => {
 
   world.register(
     System,
-    Component
+    [Component]
   )
 
   const e = world.createEntity(
-    [Component, 0]
+    [
+      [Component, 0]
+    ]
   )
 
   expect(hasComponent(e, Component)).toBe(true)
@@ -33,14 +36,16 @@ test('basic ecs functionality works', () => {
 test('adding components works', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
-  function OtherComponent(counter) {
-    this.counter = counter
-    return this
+  class OtherComponent {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
@@ -49,23 +54,25 @@ test('adding components works', () => {
 
   world.register(
     System,
-    Component,
-    OtherComponent
+    [
+      Component,
+      OtherComponent
+    ]
   )
 
   const e = world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   world.run()
 
   expect(System).toHaveBeenLastCalledWith([])
 
-  expect(world.query(OtherComponent).length).toBe(0)
+  expect(world.query([OtherComponent]).length).toBe(0)
 
-  world.addComponent(e, [OtherComponent, 2])
+  world.addComponent(e, OtherComponent, 2)
 
-  expect(world.query(OtherComponent).length).toBe(1)
+  expect(world.query([OtherComponent]).length).toBe(1)
 
   world.run()
 
@@ -76,14 +83,16 @@ test('adding components works', () => {
 test('removing components works', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
-  function OtherComponent(counter) {
-    this.counter = counter
-    return this
+  class OtherComponent {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
@@ -92,24 +101,24 @@ test('removing components works', () => {
 
   world.register(
     System,
-    Component,
-    OtherComponent
+    [Component,
+    OtherComponent]
   )
 
   const e = world.createEntity(
-    [Component, 0],
-    [OtherComponent, 1]
+    [[Component, 0],
+    [OtherComponent, 1]]
   )
 
   world.run()
 
   expect(System).toHaveBeenLastCalledWith([e])
 
-  expect(world.query(OtherComponent).length).toBe(1)
+  expect(world.query([OtherComponent]).length).toBe(1)
 
   world.removeComponent(e, OtherComponent)
 
-  expect(world.query(OtherComponent).length).toBe(0)
+  expect(world.query([OtherComponent]).length).toBe(0)
 
   world.run()
 
@@ -120,20 +129,21 @@ test('removing components works', () => {
 test('updating components works, and triggers subscriptions', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn()
 
   world.register(
     System,
-    Component,
+    [Component],
   )
 
   const e = world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   const subscription = jest.fn()
@@ -154,20 +164,21 @@ test('updating components works, and triggers subscriptions', () => {
 test('you can optionally pass messages to world.run', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn()
 
   world.register(
     System,
-    Component,
+    [Component],
   )
 
   const e = world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   world.run(12, 'foo')
@@ -184,20 +195,21 @@ test('you can configure lifecycle hooks', () => {
     onBefore
   })
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn()
 
   world.register(
     System,
-    Component,
+    [Component],
   )
 
   world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   world.run(12)
@@ -209,20 +221,21 @@ test('you can configure lifecycle hooks', () => {
 test('you can subscribe to entity updates', () => {
   const world = new World()
 
-  function Component(counter) {
-    this.counter = counter
-    return this
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
   }
 
   const System = jest.fn()
 
   world.register(
     System,
-    Component,
+    [Component]
   )
 
   const e1 = world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   const subscription = jest.fn()
@@ -232,7 +245,7 @@ test('you can subscribe to entity updates', () => {
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
   const e2 = world.createEntity(
-    [Component, 0]
+    [[Component, 0]]
   )
 
   expect(subscription).toHaveBeenLastCalledWith([e1, e2])
@@ -271,14 +284,14 @@ it('the readme example should work', () => {
   // register the System to receive entities with both position and velocity components
   world.register(
     System,
-    Position,
-    Velocity
+    [Position,
+    Velocity]
   )
 
   // create an entity
   const e = world.createEntity(
-    [Position, 0],
-    [Velocity, 2]
+    [[Position, 0],
+    [Velocity, 2]]
   )
 
   // execute all systems in parallel

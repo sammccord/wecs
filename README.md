@@ -3,7 +3,7 @@
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
 
-> A **wee (small)** Entity Component System for Javascript. 0 deps, <1k gzipped
+> A **wee (small)** Entity Component System for Javascript. 0 deps, ~1k gzipped
 
 - [wecs](#wecs)
   - [Installation](#installation)
@@ -11,17 +11,20 @@
   - [API](#api)
     - [`World`](#world)
       - [`constructor(config: Config = {})`](#constructorconfig-config)
-      - [`register(system: Function, ...components: Component<unknown>[]): void`](#registersystem-function-components-componentunknown-void)
-      - [`query(...components: Component<unknown>[]): Entity[]`](#querycomponents-componentunknown-entity)
-      - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit: boolean = false): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean--false-function)
-      - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback): void`](#unsubscribecomponents-componentunknown-callback-querycallback-void)
-      - [`createEntity(...components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
-      - [`addComponent(entity: Entity, ...components: [Component<unknown>, ...any[]][])`](#addcomponententity-entity-components-componentunknown-any)
-      - [`updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`](#updatecomponenttentity-entity-component-updater-component-t--t)
-      - [`removeComponent(entity: Entity, ...components: Component<unknown>[])`](#removecomponententity-entity-components-componentunknown)
+      - [`addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`](#addcomponenttentity-entity-component-componentt-args-any)
+      - [`addComponents(entity: Entity, components: [Component<unknown>, ...any[]][])`](#addcomponentsentity-entity-components-componentunknown-any)
+      - [`createEntity(components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
+      - [`query(components: Component<unknown>[]): Entity[]`](#querycomponents-componentunknown-entity)
+      - [`register(system: Function, components: Component<unknown>[])`](#registersystem-function-components-componentunknown)
+      - [`removeComponent<T>(entity: Entity, component: Component<T>)`](#removecomponenttentity-entity-component-componentt)
+      - [`removeComponents(entity: Entity, components: Component<unknown>[])`](#removecomponentsentity-entity-components-componentunknown)
       - [`async run(...args: any[]): Promise<void>`](#async-runargs-any-promisevoid)
+      - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean-function)
+      - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback)`](#unsubscribecomponents-componentunknown-callback-querycallback)
+      - [`updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`](#updatecomponenttentity-entity-component-updater-component-t--t)
     - [`getComponent<T>(entity: Entity, Component: Component<T>): T`](#getcomponenttentity-entity-component-componentt-t)
-    - [`hasComponent(entity: Entity, ...components: Component<unknown>[])`](#hascomponententity-entity-components-componentunknown)
+    - [`hasComponent<T>(entity: Entity, components: Component<T>)`](#hascomponenttentity-entity-components-componentt)
+    - [`hasComponents(entity: Entity, components: Component<unknown>[])`](#hascomponentsentity-entity-components-componentunknown)
 
 ## Installation
 
@@ -40,9 +43,10 @@ import World, { getComponent } from 'wecs'
 const world = new World()
 
 // create a component, components must have a name property and be newable
-function Position(pos) {
-  this.pos = pos
-  return this
+class Position {
+  constructor(pos) {
+    this.pos = pos
+  }
 }
 // so class components also work
 class Velocity {
@@ -63,15 +67,17 @@ function System(entities) {
 // register the System to receive entities with both position and velocity components
 world.register(
   System,
-  Position,
-  Velocity
+  [
+    Position,
+    Velocity
+  ]
 )
 
 // create an entity
-world.createEntity(
+world.createEntity([
   [Position, 0],
   [Velocity, 2]
-)
+])
 
 // execute all systems in parallel
 world.run()
@@ -94,14 +100,71 @@ You can construct `World` with the following config shape. All properties are op
 |`onBefore`|`(...args: any[]) => Promise<void>`|A function called with an optional message before all systems are run.`|
 |`onAfter`|`(...args: any[]) => Promise<void>`|A function called with an optional message after all systems are run.`|
 
-#### `register(system: Function, ...components: Component<unknown>[]): void`
+#### `addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`
+
+Add a single component to a given entity
+
+```js
+class Position {
+  constructor(number, bar) {
+    console.assert(number === 0)
+    console.assert(foo === 'foo')
+  }
+}
+
+world.addComponent(e, Position, 0, 'foo')
+```
+
+#### `addComponents(entity: Entity, components: [Component<unknown>, ...any[]][])`
+
+Adds components to a given entity
+
+```js
+
+world.addComponents(
+  e,
+  [
+    [Position, 0, 'foo'],
+    [Velocity, 2, 'bar']
+  ]
+)
+```
+
+#### `createEntity(components: [Component<unknown>, ...any[]][]): Entity`
+
+Creates an entity with the provided Components and values.
+
+```js
+class Velocity {
+  constructor(number, bar) {
+    console.assert(number === 2)
+    console.assert(foo === 'bar')
+  }
+}
+
+const entity = world.createEntity([
+  [Position, 0, 'foo'],
+  [Velocity, 2, 'bar']
+])
+```
+
+#### `query(components: Component<unknown>[]): Entity[]`
+
+Query all entities that meet the component criteria
+
+```js
+const entities = world.query([Position, Velocity])
+```
+
+#### `register(system: Function, components: Component<unknown>[])`
 
 Register a system function to be called with entities that meet all of the component criteria:
 
 ```js
-function Component() {
-  this.foo = 'bar'
-  return this
+class Component {
+  constructor(counter) {
+    this.foo = 'bar'
+  }
 }
 
 function System(entities) {
@@ -110,144 +173,30 @@ function System(entities) {
   })
 }
 
-world.register(System, Component, OtherComponent, ThirdComponent)
+world.register(System, [Component, OtherComponent, ThirdComponent])
 ```
 
-#### `query(...components: Component<unknown>[]): Entity[]`
+#### `removeComponent<T>(entity: Entity, component: Component<T>)`
 
-Query all entities that meet the component criteria
-
-```js
-const entities = world.query(Position, Velocity)
-```
-
-#### `subscribe(components: Component<unknown>[], callback: QueryCallback, emit: boolean = false): Function`
-
-Subscribe to updates with a callback function that gets executed when:
-  * a new entity meeting the component criteria gets created
-  * an entity gets a new component that meets the criteria
-  * an entity has a component removed that makes it no longer meet the criteria
-  * an entity's component is updated via `world.updateComponent`
-
-The third `emit` argument, when `true`, will immediately call the callback with relevant entities.
-
-This method will also return a function you can use to unsubscribe.
-
-```js
-const unsubscribe = world.subscribe(
-  [Position, Velocity],
-  (entities) => console.log(entities),
-  true
-)
-
-unsubscribe()
-```
-
-#### `unsubscribe(components: Component<unknown>[], callback: QueryCallback): void`
-
-Another way to unsubscribe, handy for `rxjs`
-
-```js
-
-import { fromEventPattern } from 'rxjs';
- 
-const addHandler = (components) => (handler) => {
-  world.subscribe(components, handler, true)
-}
- 
-const removeHandler = (components) => (handler) => {
-  world.unsubscribe(components, handler)
-}
- 
-const entities = fromEventPattern(
-  addHandler([Position, Velocity]),
-  removeHandler([Position, Velocity])
-)
-
-entities.subscribe(entities => console.log(entities))
-```
-
-#### `createEntity(...components: [Component<unknown>, ...any[]][]): Entity`
-
-Creates an entity with the provided Components and values.
-
-```js
-function Position(number, foo) {
-  console.assert(number === 0)
-  console.assert(foo === 'foo')
-  return this
-}
-
-class Velocity {
-  constructor(number, bar) {
-    console.assert(number === 2)
-    console.assert(foo === 'bar')
-  }
-}
-
-
-const entity = world.createEntity(
-  [Position, 0, 'foo'],
-  [Velocity, 2, 'bar']
-)
-```
-
-#### `addComponent(entity: Entity, ...components: [Component<unknown>, ...any[]][])`
-
-Adds components to a given entity
-
-```js
-
-world.addComponent(
-  e,
-  [Position, 0, 'foo'],
-  [Velocity, 2, 'bar']
-)
-```
-
-#### `updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`
-
-Takes an entity, a component, and a callback function that is called with value of the entity's component.
-
-If the callback returns a value, the entity's component will be set to that value.
-
-Afterwards, trigger all relevant subscriptions
-
-```js
-function Component(multiplier = 2) {
-  this.values = [1, 2, 3].map(v => v * multiplier)
-  return this
-}
-
-const entity = world.createEntity(
-  [Component, 1]
-)
-
-world.updateComponent(entity, Component, c => {
-  // mutate the component directly
-  c.values = []
-}
-
-world.updateComponent(e, Component, c => {
-    // reset the value
-  return new Component(3)
-})
-
-world.subscribe([Component], (entities) => {
-  // this will be called twice
-})
-```
-
-#### `removeComponent(entity: Entity, ...components: Component<unknown>[])`
-
-Removes components from a given entity
+Removes a single component from a given entity
 
 ```js
 
 world.removeComponent(
   e,
-  Position,
-  Velocity
+  Position
+)
+```
+
+#### `removeComponents(entity: Entity, components: Component<unknown>[])`
+
+Removes components from a given entity
+
+```js
+
+world.removeComponents(
+  e,
+  [Position, Velocity]
 )
 ```
 
@@ -288,6 +237,85 @@ if(foo) world.run(delta)
 else world.run()
 ```
 
+#### `subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`
+
+Subscribe to updates with a callback function that gets executed when:
+  * a new entity meeting the component criteria gets created
+  * an entity gets a new component that meets the criteria
+  * an entity has a component removed that makes it no longer meet the criteria
+  * an entity's component is updated via `world.updateComponent`
+
+The third `emit` argument, when `true`, will immediately call the callback with relevant entities.
+
+This method will also return a function you can use to unsubscribe.
+
+```js
+const unsubscribe = world.subscribe(
+  [Position, Velocity],
+  (entities) => console.log(entities),
+  true
+)
+
+unsubscribe()
+```
+
+#### `unsubscribe(components: Component<unknown>[], callback: QueryCallback)`
+
+Another way to unsubscribe, handy for `rxjs`
+
+```js
+
+import { fromEventPattern } from 'rxjs';
+ 
+const addHandler = (components) => (handler) => {
+  world.subscribe(components, handler, true)
+}
+ 
+const removeHandler = (components) => (handler) => {
+  world.unsubscribe(components, handler)
+}
+ 
+const entities = fromEventPattern(
+  addHandler([Position, Velocity]),
+  removeHandler([Position, Velocity])
+)
+
+entities.subscribe(entities => console.log(entities))
+```
+
+#### `updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`
+
+Takes an entity, a component, and a callback function that is called with value of the entity's component.
+
+If the callback returns a value, the entity's component will be set to that value.
+
+Afterwards, trigger all relevant subscriptions
+
+```js
+function Component(multiplier = 2) {
+  this.values = [1, 2, 3].map(v => v * multiplier)
+  return this
+}
+
+const entity = world.createEntity([
+  [Component, 1]
+])
+
+world.updateComponent(entity, Component, c => {
+  // mutate the component directly
+  c.values = []
+}
+
+world.updateComponent(e, Component, c => {
+    // reset the value
+  return new Component(3)
+})
+
+world.subscribe([Component], (entities) => {
+  // this will be called twice
+})
+```
+
 ### `getComponent<T>(entity: Entity, Component: Component<T>): T`
 
 Given an entity, gets the given component or null if the entity doesn't have it.
@@ -295,25 +323,41 @@ Given an entity, gets the given component or null if the entity doesn't have it.
 ```js
 import { getComponent } from 'wecs'
 
-const entity = world.createEntity(
+const entity = world.createEntity([
   [Position, 0],
   [Velocity, 2]
-)
+])
 
 const position = getComponent(entity, Position)
 ```
 
-### `hasComponent(entity: Entity, ...components: Component<unknown>[])`
+### `hasComponent<T>(entity: Entity, components: Component<T>)`
 
 Given an entity, gets the given component or null if the entity doesn't have it.
 
 ```js
 import { hasComponent } from 'wecs'
 
-const entity = world.createEntity(
+const entity = world.createEntity([
   [Position, 0],
   [Velocity, 2]
-)
+])
 
-console.assert(hasComponent(entity, Position, Velocity))
+console.assert(hasComponent(entity, Position))
+```
+
+
+### `hasComponents(entity: Entity, components: Component<unknown>[])`
+
+Given an entity, gets the given component or null if the entity doesn't have it.
+
+```js
+import { hasComponents } from 'wecs'
+
+const entity = world.createEntity([
+  [Position, 0],
+  [Velocity, 2]
+])
+
+console.assert(hasComponents(entity, [Position, Velocity]))
 ```
