@@ -1,11 +1,19 @@
-# wecs
+# `(wee)` Entity Component System
 
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
 
-> A **wee (small)** Entity Component System for Javascript. 0 deps, ~1k gzipped
+> A **tiny** Entity Component System for Javascript. 0 deps, ~1k gzipped
 
-- [wecs](#wecs)
+## Features
+
+* Super small & simple
+* Unopinionated - no classes to extend, bring your own batteries
+* Flexible - Use ECS or Observer pattern to interact with entities, any class can be a component.
+* Performant - Doesn't re-implement a GC, entities are deleted when they have no components and fall out of scope, avoids unnecessary iteration.
+
+- [`(wee)` Entity Component System](#wee-entity-component-system)
+  - [Features](#features)
   - [Installation](#installation)
   - [Quick Start](#quick-start)
   - [API](#api)
@@ -42,13 +50,12 @@ import World, { getComponent } from 'wecs'
 // instantiate the world
 const world = new World()
 
-// create a component, components must have a name property and be newable
+// create a component
 class Position {
   constructor(pos) {
     this.pos = pos
   }
 }
-// so class components also work
 class Velocity {
   constructor(vel) {
     this.vel = vel
@@ -94,11 +101,11 @@ world.run()
 
 You can construct `World` with the following config shape. All properties are optional.
 
-|Key|Type|Description|
-|-|-|-|
-|`parallel`|`boolean`|Run all systems in parallel|
-|`onBefore`|`(...args: any[]) => Promise<void>`|A function called with an optional message before all systems are run.`|
-|`onAfter`|`(...args: any[]) => Promise<void>`|A function called with an optional message after all systems are run.`|
+| Key        | Type                                | Description                                                             |
+| ---------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| `parallel` | `boolean`                           | Run all systems in parallel                                             |
+| `onBefore` | `(...args: any[]) => Promise<void>` | A function called with an optional message before all systems are run.` |
+| `onAfter`  | `(...args: any[]) => Promise<void>` | A function called with an optional message after all systems are run.`  |
 
 #### `addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`
 
@@ -292,10 +299,15 @@ If the callback returns a value, the entity's component will be set to that valu
 Afterwards, trigger all relevant subscriptions
 
 ```js
-function Component(multiplier = 2) {
-  this.values = [1, 2, 3].map(v => v * multiplier)
-  return this
+class Component {
+  constructor(multiplier = 2) {
+    this.values = [1, 2, 3].map(v => v * multiplier)
+  }
 }
+
+world.subscribe([Component], (entities) => {
+  // this will be called three times
+})
 
 const entity = world.createEntity([
   [Component, 1]
@@ -309,10 +321,6 @@ world.updateComponent(entity, Component, c => {
 world.updateComponent(e, Component, c => {
     // reset the value
   return new Component(3)
-})
-
-world.subscribe([Component], (entities) => {
-  // this will be called twice
 })
 ```
 
