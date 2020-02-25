@@ -1,9 +1,9 @@
 # `(wee)` Entity Component System
 
+> A **tiny** Entity Component System for Javascript. 0 deps, ~1k gzipped
+
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
-
-> A **tiny** Entity Component System for Javascript. 0 deps, ~1k gzipped
 
 ## Features
 
