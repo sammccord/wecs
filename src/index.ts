@@ -31,7 +31,7 @@ export function hasComponents(entity: Entity, components: Component<unknown>[]) 
   return components.every(c => !!entity[c.name])
 }
 
-export default class World {
+export class World {
 
   protected config: Config = {}
 
@@ -53,21 +53,21 @@ export default class World {
     return this._entities.filter(e => hasComponents(e, components))
   }
 
-  private _handleAddCallbacks (entity) {
+  private _handleAddCallbacks (e: Entity) {
     Object.values(this._queries).forEach(query => {
-      if (!query.entities.includes(entity)) {
-        if(query.components.every(c => !!entity[c.name])) {
-          query.entities.push(entity)
+      if (!query.entities.includes(e)) {
+        if(hasComponents(e, query.components)) {
+          query.entities.push(e)
           query.callbacks.forEach(fn => fn(query.entities))
         }
       }
     })
   }
 
-  private _handleRemoveCallbacks (entity) {
+  private _handleRemoveCallbacks (entity: Entity) {
     Object.values(this._queries).forEach(query => {
       if (!query.entities.includes(entity)) return
-      if(!query.components.every(c => !!entity[c.name])) {
+      if(!hasComponents(entity, query.components)) {
         query.entities.splice(query.entities.indexOf(entity), 1)
         query.callbacks.forEach(fn => fn(query.entities))
       }
@@ -98,7 +98,7 @@ export default class World {
     this._entities.push(entity)
 
     Object.values(this._queries).forEach(query => {
-      if (query.components.every(c => !!entity[c.name])) {
+      if (hasComponents(entity, query.components)) {
         query.entities.push(entity)
       }
 

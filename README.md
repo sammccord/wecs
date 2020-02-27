@@ -45,7 +45,7 @@ yarn add wecs
 For a more complete example, see [the examples which don't exist yet](./example/basic.ts)
 
 ```js
-import World, { getComponent } from 'wecs'
+import { World, getComponent } from 'wecs'
 
 // instantiate the world
 const world = new World()

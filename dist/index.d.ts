@@ -12,7 +12,7 @@ interface Config {
 export declare function getComponent<T>(entity: Entity, Component: Component<T>): T;
 export declare function hasComponent<T>(entity: Entity, components: Component<T>): boolean;
 export declare function hasComponents(entity: Entity, components: Component<unknown>[]): boolean;
-export default class World {
+export declare class World {
     protected config: Config;
     private _systems;
     private _entities;

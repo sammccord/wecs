@@ -1,4 +1,4 @@
-import World, { getComponent, hasComponent } from './index'
+import { World, getComponent, hasComponent } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
