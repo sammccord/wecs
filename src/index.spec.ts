@@ -1,4 +1,4 @@
-import { World, getComponent, hasComponent } from './index'
+import { World, getComponent, getComponents, hasComponent } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
@@ -31,6 +31,31 @@ test('basic ecs functionality works', () => {
   expect(System).toHaveBeenCalledTimes(1)
   expect(System).toHaveBeenCalledWith([e])
   expect(getComponent(e, Component).counter).toBe(1)
+})
+
+test('getting components works', () => {
+  const world = new World()
+
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  class OtherComponent {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  const e = world.createEntity(
+    [
+      [Component, 0],
+      [OtherComponent, 0]
+    ]
+  )
+
+  expect(getComponent(e, Component).counter).toBe(0)
 })
 
 test('adding components works', () => {
