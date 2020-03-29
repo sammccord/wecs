@@ -19,13 +19,13 @@ export declare class World {
     private _queries;
     constructor(config?: Config);
     protected makeQueryKey(components: Component<unknown>[]): string;
-    protected queryWithKey(key: any, components: Component<unknown>[]): Entity[];
+    protected queryWithKey(key: any, components: Component<unknown>[], persist?: Boolean): Entity[];
     private _handleAddCallbacks;
     private _handleRemoveCallbacks;
     addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[]): void;
     addComponents(entity: Entity, components: [Component<unknown>, ...any[]][]): void;
     createEntity(components: [Component<unknown>, ...any[]][]): Entity;
-    query(components: Component<unknown>[]): Entity[];
+    query(components: Component<unknown>[], persist?: Boolean): Entity[];
     register(system: Function, components: Component<unknown>[]): void;
     removeComponent<T>(entity: Entity, component: Component<T>): void;
     removeComponents(entity: Entity, components: Component<unknown>[]): void;

@@ -155,12 +155,12 @@ const entity = world.createEntity([
 ])
 ```
 
-#### `query(components: Component<unknown>[]): Entity[]`
+#### `query(components: Component<unknown>[], persist?: Boolean): Entity[]`
 
-Query all entities that meet the component criteria
+Query all entities that meet the component criteria, optionally saving the query for faster retrieval later.
 
 ```js
-const entities = world.query([Position, Velocity])
+const entities = world.query([Position, Velocity], true)
 ```
 
 #### `register(system: Function, components: Component<unknown>[])`

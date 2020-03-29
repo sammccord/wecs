@@ -47,16 +47,17 @@ export class World {
     return components.map(c => c.name).sort().join('-')
   }
 
-  protected queryWithKey(key, components: Component<unknown>[]): Entity[] {
+  protected queryWithKey(key, components: Component<unknown>[], persist?: Boolean): Entity[] {
     if (this._queries[key]) return this._queries[key].entities
-    
-    return this._entities.filter(e => hasComponents(e, components))
+    const entities = this._entities.filter(e => hasComponents(e, components))
+    if (persist) this._queries[key] = { components, entities, callbacks: [] }
+    return entities
   }
 
-  private _handleAddCallbacks (e: Entity) {
+  private _handleAddCallbacks(e: Entity) {
     Object.values(this._queries).forEach(query => {
       if (!query.entities.includes(e)) {
-        if(hasComponents(e, query.components)) {
+        if (hasComponents(e, query.components)) {
           query.entities.push(e)
           query.callbacks.forEach(fn => fn(query.entities))
         }
@@ -64,10 +65,10 @@ export class World {
     })
   }
 
-  private _handleRemoveCallbacks (entity: Entity) {
+  private _handleRemoveCallbacks(entity: Entity) {
     Object.values(this._queries).forEach(query => {
       if (!query.entities.includes(entity)) return
-      if(!hasComponents(entity, query.components)) {
+      if (!hasComponents(entity, query.components)) {
         query.entities.splice(query.entities.indexOf(entity), 1)
         query.callbacks.forEach(fn => fn(query.entities))
       }
@@ -108,9 +109,9 @@ export class World {
     return entity
   }
 
-  public query(components: Component<unknown>[]): Entity[] {
+  public query(components: Component<unknown>[], persist?: Boolean): Entity[] {
     const key = this.makeQueryKey(components)
-    return this.queryWithKey(key, components)
+    return this.queryWithKey(key, components, persist)
   }
 
   public register(system: Function, components: Component<unknown>[]): void {
@@ -135,16 +136,16 @@ export class World {
 
   public async run(...args: any[]): Promise<void> {
     if (this.config.onBefore) await this.config.onBefore(...args)
-    if(this.config.parallel) {
+    if (this.config.parallel) {
       this._systems.forEach(([system, queryKey]) => {
-        if(args) system(...args, this._queries[queryKey].entities)
+        if (args) system(...args, this._queries[queryKey].entities)
         else system(this._queries[queryKey].entities)
       })
     } else {
-      for(let [system, queryKey] of this._systems) {
-        if(args) await system(...args, this._queries[queryKey].entities)
+      for (let [system, queryKey] of this._systems) {
+        if (args) await system(...args, this._queries[queryKey].entities)
         else await system(this._queries[queryKey].entities)
-      } 
+      }
     }
     if (this.config.onAfter) await this.config.onAfter(...args)
   }
@@ -158,9 +159,9 @@ export class World {
       entities,
       callbacks: [callback]
     }
-    if(emit) callback(entities)
+    if (emit) callback(entities)
     return () => {
-      if(!!this._queries[key]) {
+      if (!!this._queries[key]) {
         this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
       }
     }
@@ -168,7 +169,7 @@ export class World {
 
   public unsubscribe(components: Component<unknown>[], callback: QueryCallback): void {
     const key = this.makeQueryKey(components)
-    if(!!this._queries[key]) {
+    if (!!this._queries[key]) {
       this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
     }
   }

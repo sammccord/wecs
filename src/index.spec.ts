@@ -103,6 +103,26 @@ test('adding components works', () => {
 
   expect(System).toHaveBeenLastCalledWith([e])
 
+  expect((world as any)._queries.OtherComponent.entities).toContain(e)
+
+})
+
+test('you can persist queries for faster retrieval', () => {
+  const world = new World()
+
+  class Component {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  const e = world.createEntity(
+    [[Component, 0]]
+  )
+
+  expect(world.query([Component], true).length).toBe(1)
+
+  expect((world as any)._queries.Component.entities).toContain(e)
 })
 
 test('removing components works', () => {
@@ -127,7 +147,7 @@ test('removing components works', () => {
   world.register(
     System,
     [Component,
-    OtherComponent]
+      OtherComponent]
   )
 
   const e = world.createEntity(
@@ -310,7 +330,7 @@ it('the readme example should work', () => {
   world.register(
     System,
     [Position,
-    Velocity]
+      Velocity]
   )
 
   // create an entity
@@ -321,6 +341,6 @@ it('the readme example should work', () => {
 
   // execute all systems in parallel
   world.run()
-  
+
   expect(getComponent(e, Position).pos).toBe(2)
 })
