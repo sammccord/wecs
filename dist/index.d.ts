@@ -4,6 +4,7 @@ interface Component<T> {
     name: string;
 }
 declare type QueryCallback = (entities: Entity[]) => void;
+declare type ComponentUpdater<T> = (component: T) => T;
 interface Config {
     parallel?: boolean;
     onBefore?: (...args: any[]) => Promise<void>;
@@ -32,6 +33,6 @@ export declare class World {
     run(...args: any[]): Promise<void>;
     subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function;
     unsubscribe(components: Component<unknown>[], callback: QueryCallback): void;
-    updateComponent<T>(entity: Entity, Component: any, updater: (component: T) => T): void;
+    updateComponent<T>(entity: Entity, Component: any, update: any | ComponentUpdater<T>): void;
 }
 export {};
