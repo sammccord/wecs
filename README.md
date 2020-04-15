@@ -22,14 +22,14 @@
       - [`addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`](#addcomponenttentity-entity-component-componentt-args-any)
       - [`addComponents(entity: Entity, components: [Component<unknown>, ...any[]][])`](#addcomponentsentity-entity-components-componentunknown-any)
       - [`createEntity(components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
-      - [`query(components: Component<unknown>[]): Entity[]`](#querycomponents-componentunknown-entity)
+      - [`query(components: Component<unknown>[], persist?: Boolean): Entity[]`](#querycomponents-componentunknown-entity)
       - [`register(system: Function, components: Component<unknown>[])`](#registersystem-function-components-componentunknown)
       - [`removeComponent<T>(entity: Entity, component: Component<T>)`](#removecomponenttentity-entity-component-componentt)
       - [`removeComponents(entity: Entity, components: Component<unknown>[])`](#removecomponentsentity-entity-components-componentunknown)
       - [`async run(...args: any[]): Promise<void>`](#async-runargs-any-promisevoid)
       - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean-function)
       - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback)`](#unsubscribecomponents-componentunknown-callback-querycallback)
-      - [`updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`](#updatecomponenttentity-entity-component-updater-component-t--t)
+      - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`](#updatecomponenttentity-entity-component-updater-component-t--t)
     - [`getComponent<T>(entity: Entity, Component: Component<T>): T`](#getcomponenttentity-entity-component-componentt-t)
     - [`hasComponent<T>(entity: Entity, components: Component<T>)`](#hascomponenttentity-entity-components-componentt)
     - [`hasComponents(entity: Entity, components: Component<unknown>[])`](#hascomponentsentity-entity-components-componentunknown)
@@ -290,9 +290,9 @@ const entities = fromEventPattern(
 entities.subscribe(entities => console.log(entities))
 ```
 
-#### `updateComponent<T>(entity: Entity, Component, updater: (component: T) => T)`
+#### `updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`
 
-Takes an entity, a component, and a callback function that is called with value of the entity's component.
+Takes an entity, a component, and a either callback function that is called with value of the entity's component, or a new value for the component.
 
 If the callback returns a value, the entity's component will be set to that value.
 
@@ -322,6 +322,9 @@ world.updateComponent(e, Component, c => {
     // reset the value
   return new Component(3)
 })
+
+// reset the value
+world.updateComponent(e, Component, new Component(3))
 ```
 
 ### `getComponent<T>(entity: Entity, Component: Component<T>): T`

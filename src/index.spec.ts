@@ -97,12 +97,13 @@ test('adding components works', () => {
 
   world.addComponent(e, OtherComponent, 2)
 
-  expect(world.query([OtherComponent]).length).toBe(1)
+  expect(world.query([OtherComponent], true).length).toBe(1)
 
   world.run()
 
   expect(System).toHaveBeenLastCalledWith([e])
 
+  console.log(world._queries)
   expect((world as any)._queries.OtherComponent.entities).toContain(e)
 
 })
@@ -202,6 +203,11 @@ test('updating components works, and triggers subscriptions', () => {
   expect(getComponent(e, Component).counter).toBe(1)
   expect(subscription).toHaveBeenCalledTimes(1)
   expect(subscription).toHaveBeenLastCalledWith([e])
+
+  world.updateComponent(e, Component, new Component(5))
+  expect(getComponent(e, Component).counter).toBe(5)
+
+  expect(subscription).toHaveBeenCalledTimes(2)
 
   unsub()
 })

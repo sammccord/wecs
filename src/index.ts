@@ -7,6 +7,8 @@ interface Component<T> {
 
 type QueryCallback = (entities: Entity[]) => void
 
+type ComponentUpdater<T> = (component: T) => T
+
 interface Query {
   components: Component<unknown>[],
   entities: Entity[]
@@ -174,8 +176,8 @@ export class World {
     }
   }
 
-  public updateComponent<T>(entity: Entity, Component, updater: (component: T) => T): void {
-    entity[Component.name] = updater(entity[Component.name]) || entity[Component.name]
+  public updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>): void {
+    entity[Component.name] = typeof update === 'function' ? update(entity[Component.name]) || entity[Component.name] : update
     Object.values(this._queries).forEach(query => {
       if (query.entities.includes(entity)) {
         query.callbacks.forEach(fn => fn(query.entities))
