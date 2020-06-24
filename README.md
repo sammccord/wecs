@@ -8,7 +8,6 @@
 ## Features
 
 * Super small & simple
-* Unopinionated - no classes to extend, bring your own batteries
 * Flexible - Use ECS or Observer pattern to interact with entities, any class can be a component.
 * Performant - Doesn't re-implement a GC, entities are deleted when they have no components and fall out of scope, avoids unnecessary iteration.
 
@@ -45,20 +44,19 @@ yarn add wecs
 For a more complete example, see [the examples which don't exist yet](./example/basic.ts)
 
 ```js
-import { World, getComponent } from 'wecs'
+import { World, Component, getComponent } from 'wecs'
 
 // instantiate the world
 const world = new World()
 
 // create a component
-class Position {
+class Movable {} // Functions as a tag
+class Velocity extends Component<{ val: number }> { } // Use a shorthand generic base class
+
+class Position { // use your own class
+  val: number
   constructor(pos) {
-    this.pos = pos
-  }
-}
-class Velocity {
-  constructor(vel) {
-    this.vel = vel
+    this.val = pos
   }
 }
 
@@ -66,7 +64,7 @@ class Velocity {
 function System(entities) {
   entities.forEach(e => {
     world.updateComponent(e, Position, c => {
-      c.pos += getComponent(e, Velocity).vel
+      c.val += getComponent(e, Velocity).val
     })
   })
 }
@@ -75,15 +73,17 @@ function System(entities) {
 world.register(
   System,
   [
+    Movable,
     Position,
     Velocity
   ]
 )
 
-// create an entity
+// create an entity, this one can move, has a position, and a velocity
 world.createEntity([
+  [Movable],
   [Position, 0],
-  [Velocity, 2]
+  [Velocity, { val: 2 }]
 ])
 
 // execute all systems in parallel
@@ -326,6 +326,26 @@ world.updateComponent(e, Component, c => {
 // reset the value
 world.updateComponent(e, Component, new Component(3))
 ```
+
+### `Component<T>`
+
+The exported `Component` class is a generic class that expects to be constructed with an object of shape `T`, and assigns properties of the object `T` to its context.
+
+`Component` is mainly a convenient shorthand to build typed, easily serializable components.
+
+```js
+import { Component } from 'wecs'
+
+class Position extends Component<{ x: number, y: number }> { }
+
+const p = new Position({ x: 0, y: 0 })
+console.assert(p.x === 0)
+console.assert(p.y === 0)
+
+// You can easily serialize and reconstruct components this way
+console.assert(p.x === new Position(JSON.parse(JSON.stringify(p))).x)
+```
+
 
 ### `getComponent<T>(entity: Entity, Component: Component<T>): T`
 

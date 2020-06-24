@@ -1,42 +1,42 @@
-import { World, getComponent, getComponents, hasComponent } from './index'
+import { World, getComponent, Component, getComponents, hasComponent } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
-    getComponent(e, Component).counter += 1
+    getComponent(e, Counter).counter += 1
   }))
 
   world.register(
     System,
-    [Component]
+    [Counter]
   )
 
   const e = world.createEntity(
     [
-      [Component, 0]
+      [Counter, 0]
     ]
   )
 
-  expect(hasComponent(e, Component)).toBe(true)
+  expect(hasComponent(e, Counter)).toBe(true)
 
   world.run()
 
   expect(System).toHaveBeenCalledTimes(1)
   expect(System).toHaveBeenCalledWith([e])
-  expect(getComponent(e, Component).counter).toBe(1)
+  expect(getComponent(e, Counter).counter).toBe(1)
 })
 
 test('getting components works', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -50,18 +50,18 @@ test('getting components works', () => {
 
   const e = world.createEntity(
     [
-      [Component, 0],
+      [Counter, 0],
       [OtherComponent, 0]
     ]
   )
 
-  expect(getComponent(e, Component).counter).toBe(0)
+  expect(getComponent(e, Counter).counter).toBe(0)
 })
 
 test('adding components works', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -74,19 +74,19 @@ test('adding components works', () => {
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
-    getComponent(e, Component).counter += 1
+    getComponent(e, Counter).counter += 1
   }))
 
   world.register(
     System,
     [
-      Component,
+      Counter,
       OtherComponent
     ]
   )
 
   const e = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   world.run()
@@ -103,7 +103,6 @@ test('adding components works', () => {
 
   expect(System).toHaveBeenLastCalledWith([e])
 
-  console.log(world._queries)
   expect((world as any)._queries.OtherComponent.entities).toContain(e)
 
 })
@@ -111,25 +110,25 @@ test('adding components works', () => {
 test('you can persist queries for faster retrieval', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
   }
 
   const e = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
-  expect(world.query([Component], true).length).toBe(1)
+  expect(world.query([Counter], true).length).toBe(1)
 
-  expect((world as any)._queries.Component.entities).toContain(e)
+  expect((world as any)._queries.Counter.entities).toContain(e)
 })
 
 test('removing components works', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -142,17 +141,17 @@ test('removing components works', () => {
   }
 
   const System = jest.fn(entities => entities.forEach(e => {
-    getComponent(e, Component).counter += 1
+    getComponent(e, Counter).counter += 1
   }))
 
   world.register(
     System,
-    [Component,
+    [Counter,
       OtherComponent]
   )
 
   const e = world.createEntity(
-    [[Component, 0],
+    [[Counter, 0],
     [OtherComponent, 1]]
   )
 
@@ -175,7 +174,7 @@ test('removing components works', () => {
 test('updating components works, and triggers subscriptions', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -185,27 +184,27 @@ test('updating components works, and triggers subscriptions', () => {
 
   world.register(
     System,
-    [Component],
+    [Counter],
   )
 
   const e = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   const subscription = jest.fn()
 
-  const unsub = world.subscribe([Component], subscription)
+  const unsub = world.subscribe([Counter], subscription)
 
-  world.updateComponent(e, Component, (c) => {
+  world.updateComponent(e, Counter, (c) => {
     c.counter++
   })
 
-  expect(getComponent(e, Component).counter).toBe(1)
+  expect(getComponent(e, Counter).counter).toBe(1)
   expect(subscription).toHaveBeenCalledTimes(1)
   expect(subscription).toHaveBeenLastCalledWith([e])
 
-  world.updateComponent(e, Component, new Component(5))
-  expect(getComponent(e, Component).counter).toBe(5)
+  world.updateComponent(e, Counter, new Counter(5))
+  expect(getComponent(e, Counter).counter).toBe(5)
 
   expect(subscription).toHaveBeenCalledTimes(2)
 
@@ -215,7 +214,7 @@ test('updating components works, and triggers subscriptions', () => {
 test('you can optionally pass messages to world.run', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -225,11 +224,11 @@ test('you can optionally pass messages to world.run', () => {
 
   world.register(
     System,
-    [Component],
+    [Counter],
   )
 
   const e = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   world.run(12, 'foo')
@@ -246,7 +245,7 @@ test('you can configure lifecycle hooks', () => {
     onBefore
   })
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -256,11 +255,11 @@ test('you can configure lifecycle hooks', () => {
 
   world.register(
     System,
-    [Component],
+    [Counter],
   )
 
   world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   world.run(12)
@@ -272,7 +271,7 @@ test('you can configure lifecycle hooks', () => {
 test('you can subscribe to entity updates', () => {
   const world = new World()
 
-  class Component {
+  class Counter {
     constructor(counter) {
       this.counter = counter
     }
@@ -282,34 +281,48 @@ test('you can subscribe to entity updates', () => {
 
   world.register(
     System,
-    [Component]
+    [Counter]
   )
 
   const e1 = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   const subscription = jest.fn()
 
-  const unsub = world.subscribe([Component], subscription, true)
+  const unsub = world.subscribe([Counter], subscription, true)
 
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
   const e2 = world.createEntity(
-    [[Component, 0]]
+    [[Counter, 0]]
   )
 
   expect(subscription).toHaveBeenLastCalledWith([e1, e2])
 
-  world.removeComponent(e2, Component)
+  world.removeComponent(e2, Counter)
 
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
-  world.updateComponent(e1, Component, (c) => c.counter++)
+  world.updateComponent(e1, Counter, (c) => c.counter++)
 
   expect(subscription).toHaveBeenCalledTimes(4)
 
   unsub()
+})
+
+it('exports a generic component that takes whatever', () => {
+  class Position extends Component<{ x: number, y: number }> { }
+
+  const world = new World()
+
+  const e = world.createEntity(
+    [
+      [Position, { x: 0, y: 0 }]
+    ]
+  )
+
+  expect(getComponent(e, Position).x).toBe(0)
 })
 
 it('the readme example should work', () => {
