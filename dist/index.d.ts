@@ -11,13 +11,19 @@ interface Config {
     onBefore?: (...args: any[]) => Promise<void>;
     onAfter?: (...args: any[]) => Promise<void>;
 }
+export declare function getID(entity: Entity): string;
 export declare function getComponent<T>(entity: Entity, Component: IComponent<T>): T;
 export declare function hasComponent<T>(entity: Entity, components: IComponent<T>): boolean;
 export declare function hasComponents(entity: Entity, components: IComponent<unknown>[]): boolean;
 declare class _Component<T> {
     constructor(obj?: {});
 }
+declare type Component<T> = _Component<T> & T;
 export declare const Component: new <T>(obj: T) => _Component<T> & T;
+export declare class ID extends Component<{
+    id: string;
+}> {
+}
 export declare class World {
     protected config: Config;
     private _systems;
@@ -31,6 +37,7 @@ export declare class World {
     addComponent<T>(entity: Entity, Component: IComponent<T>, ...args: any[]): void;
     addComponents(entity: Entity, components: [IComponent<unknown>, ...any[]][]): void;
     createEntity(components: [IComponent<unknown>, ...any[]][]): Entity;
+    get(id: string): Entity;
     query(components: IComponent<unknown>[], persist?: Boolean): Entity[];
     register(system: Function, components: IComponent<unknown>[]): void;
     removeComponent<T>(entity: Entity, component: IComponent<T>): void;

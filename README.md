@@ -1,6 +1,6 @@
 # `(wee)` Entity Component System
 
-> A **tiny** Entity Component System for Javascript. 0 deps, ~1k gzipped
+> A **tiny** Entity Component System for Javascript. 0 deps, ~1.5k gzipped
 
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
@@ -17,18 +17,21 @@
   - [Quick Start](#quick-start)
   - [API](#api)
     - [`World`](#world)
-      - [`constructor(config: Config = {})`](#constructorconfig-config)
+      - [`constructor(config: Config = {})`](#constructorconfig-config--)
       - [`addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`](#addcomponenttentity-entity-component-componentt-args-any)
       - [`addComponents(entity: Entity, components: [Component<unknown>, ...any[]][])`](#addcomponentsentity-entity-components-componentunknown-any)
       - [`createEntity(components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
-      - [`query(components: Component<unknown>[], persist?: Boolean): Entity[]`](#querycomponents-componentunknown-entity)
+      - [`query(components: Component<unknown>[], persist?: Boolean): Entity[]`](#querycomponents-componentunknown-persist-boolean-entity)
       - [`register(system: Function, components: Component<unknown>[])`](#registersystem-function-components-componentunknown)
       - [`removeComponent<T>(entity: Entity, component: Component<T>)`](#removecomponenttentity-entity-component-componentt)
       - [`removeComponents(entity: Entity, components: Component<unknown>[])`](#removecomponentsentity-entity-components-componentunknown)
       - [`async run(...args: any[]): Promise<void>`](#async-runargs-any-promisevoid)
       - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean-function)
       - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback)`](#unsubscribecomponents-componentunknown-callback-querycallback)
-      - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`](#updatecomponenttentity-entity-component-updater-component-t--t)
+      - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`](#updatecomponenttentity-entity-component-update-any--componentupdatert)
+    - [`Component<T>`](#componentt)
+    - [`ID`](#id)
+    - [`getID(entity: Entity): string`](#getidentity-entity-string)
     - [`getComponent<T>(entity: Entity, Component: Component<T>): T`](#getcomponenttentity-entity-component-componentt-t)
     - [`hasComponent<T>(entity: Entity, components: Component<T>)`](#hascomponenttentity-entity-components-componentt)
     - [`hasComponents(entity: Entity, components: Component<unknown>[])`](#hascomponentsentity-entity-components-componentunknown)
@@ -44,7 +47,7 @@ yarn add wecs
 For a more complete example, see [the examples which don't exist yet](./example/basic.ts)
 
 ```js
-import { World, Component, getComponent } from 'wecs'
+import { World, ID, Component, getComponent } from 'wecs'
 
 // instantiate the world
 const world = new World()
@@ -81,6 +84,7 @@ world.register(
 
 // create an entity, this one can move, has a position, and a velocity
 world.createEntity([
+  [ID, { id: 'foo' }],
   [Movable],
   [Position, 0],
   [Velocity, { val: 2 }]
@@ -346,6 +350,31 @@ console.assert(p.y === 0)
 console.assert(p.x === new Position(JSON.parse(JSON.stringify(p))).x)
 ```
 
+### `ID`
+
+It's common practice when using ECS to uniquely identify your entities. The exported `ID` class extends `Component` and has elevated component privileges. Every entity is given an ID component, and ID components can not be removed from entities, but ID components can be updated.
+
+```js
+// Entities created without an ID component will use the current timestamp in MS
+const entity = world.createEntity([Component])
+
+// Creating an entity with a custom ID component is fine too
+const entity = world.createEntity([
+  [ID, { id: 'foo' }]
+])
+getID(entity) === 'foo'
+```
+
+### `getID(entity: Entity): string`
+
+Retrieves a given entity's unique identifier from its `ID` component.
+
+```js
+const entity = world.createEntity([
+  [ID, { id: 'foo' }]
+])
+getID(entity) === 'foo'
+```
 
 ### `getComponent<T>(entity: Entity, Component: Component<T>): T`
 

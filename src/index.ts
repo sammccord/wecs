@@ -20,6 +20,10 @@ interface Config {
   onAfter?: (...args: any[]) => Promise<void>
 }
 
+export function getID(entity: Entity): string {
+  return entity[ID.name].id
+}
+
 export function getComponent<T>(entity: Entity, Component: IComponent<T>): T {
   return entity[Component.name]
 }
@@ -39,25 +43,14 @@ class _Component<T>  {
 }
 type Component<T> = _Component<T> & T
 export const Component: new <T>(obj: T) => _Component<T> & T = _Component as any;
-
-// export function Generic<T>(obj: {} = {}): ExtendedProperties<T> {
-//   return new _Generic(obj) as ExtendedProperties<T>;
-// }
-// class _Generic<T> implements ExtendedProperties<T> {
-//   constructor(obj: {} = {}) {
-//     Object.assign(this, obj)
-//   }
-// }
-// function Generic<T>(json: string): MyClass & ExtendedProperties<T> {
-//   return new MyClass(json) as MyClass & ExtendedProperties<T>;
-// }
+export class ID extends Component<{ id: string }> { }
 
 export class World {
 
   protected config: Config = {}
 
   private _systems: [Function, string][] = []
-  private _entities: Entity[] = []
+  private _entities: { [id: string]: Entity } = {}
   private _queries: { [key: string]: Query } = {}
 
   constructor(config: Config = {}) {
@@ -70,7 +63,7 @@ export class World {
 
   protected queryWithKey(key: string, components: IComponent<unknown>[], persist?: Boolean): Entity[] {
     if (this._queries[key]) return this._queries[key].entities
-    const entities = this._entities.filter(e => hasComponents(e, components))
+    const entities = Object.values(this._entities).filter(e => hasComponents(e, components))
     if (persist) this._queries[key] = { components, entities, callbacks: [] }
     return entities
   }
@@ -94,7 +87,7 @@ export class World {
         query.callbacks.forEach(fn => fn(query.entities))
       }
     })
-    if (!~Object.keys(entity).length) this._entities.splice(this._entities.indexOf(entity), 1)
+    if (Object.keys(entity).length === 1) delete this._entities[entity.ID.id]
   }
 
   public addComponent<T>(entity: Entity, Component: IComponent<T>, ...args: any[]) {
@@ -112,22 +105,20 @@ export class World {
 
   public createEntity(components: [IComponent<unknown>, ...any[]][]): Entity {
     const entity: Entity = {}
-
     components.forEach(([Constructor, ...args]) => {
       entity[Constructor.name] = new Constructor(...args)
     })
-
-    this._entities.push(entity)
-
+    if (!entity.ID) entity.ID = new ID({ id: String(new Date().valueOf()) })
+    this._entities[entity.ID.id] = entity
     Object.values(this._queries).forEach(query => {
-      if (hasComponents(entity, query.components)) {
-        query.entities.push(entity)
-      }
-
+      if (hasComponents(entity, query.components)) query.entities.push(entity)
       query.callbacks.forEach(fn => fn(query.entities))
     })
-
     return entity
+  }
+
+  public get(id: string): Entity {
+    return this._entities[id]
   }
 
   public query(components: IComponent<unknown>[], persist?: Boolean): Entity[] {
@@ -142,7 +133,7 @@ export class World {
   }
 
   public removeComponent<T>(entity: Entity, component: IComponent<T>) {
-    if (!component) return
+    if (!component || component.name === ID.name) return
     delete entity[component.name]
     this._handleRemoveCallbacks(entity)
   }
@@ -150,6 +141,7 @@ export class World {
   public removeComponents(entity: Entity, components: IComponent<unknown>[]) {
     if (!components || !~components.length) return
     components.forEach(component => {
+      if (component.name === ID.name) return
       delete entity[component.name]
     })
     this._handleRemoveCallbacks(entity)

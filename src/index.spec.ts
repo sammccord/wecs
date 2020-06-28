@@ -1,4 +1,4 @@
-import { World, getComponent, Component, getComponents, hasComponent } from './index'
+import { World, getComponent, Component, ID, getComponents, hasComponent, getID } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
@@ -169,6 +169,53 @@ test('removing components works', () => {
 
   expect(System).toHaveBeenLastCalledWith([])
 
+})
+
+test('all entities should have ID components', () => {
+  const world = new World()
+
+  class Counter {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  const e = world.createEntity(
+    [[Counter, 0]]
+  )
+
+  expect(typeof (e.ID.id)).toBe('string')
+  expect(+e.ID.id).toBeGreaterThan(0)
+})
+
+test('entities are deleted when all non-ID components are removed', () => {
+  const world = new World()
+
+  class Counter {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  const e = world.createEntity([
+    [Counter, 0],
+    [ID, { id: '1' }]
+  ])
+
+  expect(Object.values(world._entities).length).toBe(1)
+  world.removeComponent(e, Counter)
+  expect(Object.values(world._entities).length).toBe(0)
+})
+
+test('entities created with ID components use the given id', () => {
+  const world = new World()
+
+  const e = world.createEntity([
+    [ID, { id: 'abc' }]
+  ])
+
+  expect(world.get('abc')).toBe(e)
+  expect(getID(e)).toBe('abc')
 })
 
 test('updating components works, and triggers subscriptions', () => {
