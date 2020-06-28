@@ -27,6 +27,7 @@
       - [`removeComponents(entity: Entity, components: Component<unknown>[])`](#removecomponentsentity-entity-components-componentunknown)
       - [`async run(...args: any[]): Promise<void>`](#async-runargs-any-promisevoid)
       - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean-function)
+      - [`makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: QueryCallback) => () => void`](#makesubscriptioncomponents-icomponentunknown-emit-boolean-cb-querycallback----void)
       - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback)`](#unsubscribecomponents-componentunknown-callback-querycallback)
       - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`](#updatecomponenttentity-entity-component-update-any--componentupdatert)
     - [`Component<T>`](#componentt)
@@ -268,6 +269,22 @@ const unsubscribe = world.subscribe(
 )
 
 unsubscribe()
+```
+
+#### `makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: QueryCallback) => () => void`
+
+Instead of taking a callback, create a factory function that can be used to create subscriptions. Returns a function that expects a single callback function as an argument that plays nicely with other reactive frameworks.
+
+```js
+//Kefir/Rx
+var stream = Kefir.fromCallback(world.makeSubscription([Position, Velocity], true));
+
+// svelte
+function useEntities(components) {
+  return {
+    subscribe: world.makeSubscription(components, true)
+  }
+}
 ```
 
 #### `unsubscribe(components: Component<unknown>[], callback: QueryCallback)`

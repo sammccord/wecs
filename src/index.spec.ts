@@ -358,6 +358,51 @@ test('you can subscribe to entity updates', () => {
   unsub()
 })
 
+test('you can subscribe using a reusable factory function', () => {
+  const world = new World()
+
+  class Counter {
+    constructor(counter) {
+      this.counter = counter
+    }
+  }
+
+  const System = jest.fn()
+
+  world.register(
+    System,
+    [Counter]
+  )
+
+  const e1 = world.createEntity(
+    [[Counter, 0]]
+  )
+
+  const subscription = jest.fn()
+
+  const useSubscription = world.makeSubscription([Counter], true)
+
+  const unsub = useSubscription(subscription)
+
+  expect(subscription).toHaveBeenLastCalledWith([e1])
+
+  const e2 = world.createEntity(
+    [[Counter, 0]]
+  )
+
+  expect(subscription).toHaveBeenLastCalledWith([e1, e2])
+
+  world.removeComponent(e2, Counter)
+
+  expect(subscription).toHaveBeenLastCalledWith([e1])
+
+  world.updateComponent(e1, Counter, (c) => c.counter++)
+
+  expect(subscription).toHaveBeenCalledTimes(4)
+
+  unsub()
+})
+
 it('exports a generic component that takes whatever', () => {
   class Position extends Component<{ x: number, y: number }> { }
 

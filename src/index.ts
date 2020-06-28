@@ -163,19 +163,25 @@ export class World {
     if (this.config.onAfter) await this.config.onAfter(...args)
   }
 
-  public subscribe(components: IComponent<unknown>[], callback: QueryCallback, emit?: boolean): Function {
+  public subscribe(components: IComponent<unknown>[], callback: QueryCallback, emit?: boolean): () => void {
+    return this.makeSubscription(components, emit)(callback)
+  }
+
+  public makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: QueryCallback) => () => void {
     const key = this.makeQueryKey(components)
-    const entities = this.queryWithKey(key, components)
-    if (!!this._queries[key]) this._queries[key].callbacks.push(callback)
-    else this._queries[key] = {
-      components,
-      entities,
-      callbacks: [callback]
-    }
-    if (emit) callback(entities)
-    return () => {
-      if (!!this._queries[key]) {
-        this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
+    return (callback) => {
+      const entities = this.queryWithKey(key, components)
+      if (!!this._queries[key]) this._queries[key].callbacks.push(callback)
+      else this._queries[key] = {
+        components,
+        entities,
+        callbacks: [callback]
+      }
+      if (emit) callback(entities)
+      return () => {
+        if (!!this._queries[key]) {
+          this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
+        }
       }
     }
   }
