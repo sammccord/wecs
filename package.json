@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "3.5.0",
+  "version": "3.6.0-beta",
   "license": "MIT",
   "unpkg": "dist/index.umd.js",
   "types": "dist/index.d.ts",

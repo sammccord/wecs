@@ -4,17 +4,10 @@ declare type Entity = {
 interface IComponent<T> {
     new (...args: any): T;
 }
-declare type QueryCallback = (entities: Entity[]) => void;
+declare type EntitiesCallback = (entities: Entity[]) => void;
+declare type ChangeCallback<T> = (entity: Entity, updates: ComponentUpdate<T>[]) => void;
 declare type ComponentUpdater<T> = (component: T) => T;
-interface Config {
-    parallel?: boolean;
-    onBefore?: (...args: any[]) => Promise<void>;
-    onAfter?: (...args: any[]) => Promise<void>;
-}
-export declare function getID(entity: Entity): string;
-export declare function getComponent<T>(entity: Entity, Component: IComponent<T>): T;
-export declare function hasComponent<T>(entity: Entity, components: IComponent<T>): boolean;
-export declare function hasComponents(entity: Entity, components: IComponent<unknown>[]): boolean;
+declare type ComponentUpdate<T> = [IComponent<T>, any | ComponentUpdater<T>];
 declare class _Component<T> {
     constructor(obj?: {});
 }
@@ -24,6 +17,15 @@ export declare class ID extends Component<{
     id: string;
 }> {
 }
+interface Config {
+    parallel?: boolean;
+    onBefore?: (...args: any[]) => Promise<void>;
+    onAfter?: (...args: any[]) => Promise<void>;
+}
+export declare function getID(entity: Entity): string;
+export declare function getComponent<T>(entity: Entity, Component: IComponent<T>): T;
+export declare function hasComponent<T>(entity: Entity, components: IComponent<T>): boolean;
+export declare function hasComponents(entity: Entity, components: IComponent<unknown>[]): boolean;
 export declare class World {
     protected config: Config;
     private _systems;
@@ -43,8 +45,14 @@ export declare class World {
     removeComponent<T>(entity: Entity, component: IComponent<T>): void;
     removeComponents(entity: Entity, components: IComponent<unknown>[]): void;
     run(...args: any[]): Promise<void>;
-    subscribe(components: IComponent<unknown>[], callback: QueryCallback, emit?: boolean): Function;
-    unsubscribe(components: IComponent<unknown>[], callback: QueryCallback): void;
-    updateComponent<T>(entity: Entity, Component: IComponent<T>, update: any | ComponentUpdater<T>): void;
+    subscribe(components: IComponent<unknown>[], callback: EntitiesCallback, emit?: boolean): () => void;
+    makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: EntitiesCallback) => () => void;
+    handleChange(components: IComponent<unknown>[], callback: ChangeCallback<unknown>): () => void;
+    makeChangeHandler(components: IComponent<unknown>[]): (cb: ChangeCallback<unknown>) => () => void;
+    unsubscribe(components: IComponent<unknown>[], callback: EntitiesCallback): void;
+    deregisterHandler(components: IComponent<unknown>[], callback: ChangeCallback<unknown>): void;
+    updateComponent<T>(entity: Entity, Component: IComponent<T>, update: any | ComponentUpdater<T>): T;
+    updateComponents(entity: Entity, updates: ComponentUpdate<any>[]): any[];
+    private _update;
 }
 export {};

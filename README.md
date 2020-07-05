@@ -1,6 +1,6 @@
 # `(wee)` Entity Component System
 
-> A **tiny** Entity Component System for Javascript. 0 deps, ~1.5k gzipped
+> A **tiny** Entity Component System for Javascript. 0 deps, ~2k gzipped
 
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg)
 ![](https://img.badgesize.io/sammccord/wecs/master/dist/index.umd.js.svg?compression=gzip)
@@ -311,7 +311,7 @@ const entities = fromEventPattern(
 entities.subscribe(entities => console.log(entities))
 ```
 
-#### `updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`
+#### `updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>): `
 
 Takes an entity, a component, and a either callback function that is called with value of the entity's component, or a new value for the component.
 

@@ -4,14 +4,26 @@ interface IComponent<T> {
   new(...args: any): T
 }
 
-type QueryCallback = (entities: Entity[]) => void
+type EntitiesCallback = (entities: Entity[]) => void
+type ChangeCallback<T> = (entity: Entity, updates: ComponentUpdate<T>[]) => void
 
 type ComponentUpdater<T> = (component: T) => T
+type ComponentUpdate<T> = [IComponent<T>, any | ComponentUpdater<T>]
+
+class _Component<T>  {
+  constructor(obj = {}) {
+    Object.assign(this, obj)
+  }
+}
+type Component<T> = _Component<T> & T
+export const Component: new <T>(obj: T) => _Component<T> & T = _Component as any;
+export class ID extends Component<{ id: string }> { }
 
 interface Query {
   components: IComponent<unknown>[],
   entities: Entity[]
-  callbacks: QueryCallback[]
+  subscriptions: EntitiesCallback[]
+  changeHandlers: ChangeCallback<any>[]
 }
 
 interface Config {
@@ -36,15 +48,6 @@ export function hasComponents(entity: Entity, components: IComponent<unknown>[])
   return components.every(c => !!entity[c.name])
 }
 
-class _Component<T>  {
-  constructor(obj = {}) {
-    Object.assign(this, obj)
-  }
-}
-type Component<T> = _Component<T> & T
-export const Component: new <T>(obj: T) => _Component<T> & T = _Component as any;
-export class ID extends Component<{ id: string }> { }
-
 export class World {
 
   protected config: Config = {}
@@ -64,7 +67,7 @@ export class World {
   protected queryWithKey(key: string, components: IComponent<unknown>[], persist?: Boolean): Entity[] {
     if (this._queries[key]) return this._queries[key].entities
     const entities = Object.values(this._entities).filter(e => hasComponents(e, components))
-    if (persist) this._queries[key] = { components, entities, callbacks: [] }
+    if (persist) this._queries[key] = { components, entities, subscriptions: [], changeHandlers: [] }
     return entities
   }
 
@@ -73,7 +76,7 @@ export class World {
       if (!query.entities.includes(e)) {
         if (hasComponents(e, query.components)) {
           query.entities.push(e)
-          query.callbacks.forEach(fn => fn(query.entities))
+          query.subscriptions.forEach(fn => fn(query.entities))
         }
       }
     })
@@ -84,7 +87,7 @@ export class World {
       if (!query.entities.includes(entity)) return
       if (!hasComponents(entity, query.components)) {
         query.entities.splice(query.entities.indexOf(entity), 1)
-        query.callbacks.forEach(fn => fn(query.entities))
+        query.subscriptions.forEach(fn => fn(query.entities))
       }
     })
     if (Object.keys(entity).length === 1) delete this._entities[entity.ID.id]
@@ -112,7 +115,7 @@ export class World {
     this._entities[entity.ID.id] = entity
     Object.values(this._queries).forEach(query => {
       if (hasComponents(entity, query.components)) query.entities.push(entity)
-      query.callbacks.forEach(fn => fn(query.entities))
+      query.subscriptions.forEach(fn => fn(query.entities))
     })
     return entity
   }
@@ -129,7 +132,7 @@ export class World {
   public register(system: Function, components: IComponent<unknown>[]): void {
     const key = this.makeQueryKey(components)
     this._systems.push([system, key])
-    this._queries[key] = { components, entities: [], callbacks: [] }
+    this._queries[key] = { components, entities: [], subscriptions: [], changeHandlers: [] }
   }
 
   public removeComponent<T>(entity: Entity, component: IComponent<T>) {
@@ -163,42 +166,80 @@ export class World {
     if (this.config.onAfter) await this.config.onAfter(...args)
   }
 
-  public subscribe(components: IComponent<unknown>[], callback: QueryCallback, emit?: boolean): () => void {
+  public subscribe(components: IComponent<unknown>[], callback: EntitiesCallback, emit?: boolean): () => void {
     return this.makeSubscription(components, emit)(callback)
   }
 
-  public makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: QueryCallback) => () => void {
+  public makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: EntitiesCallback) => () => void {
     const key = this.makeQueryKey(components)
     return (callback) => {
       const entities = this.queryWithKey(key, components)
-      if (!!this._queries[key]) this._queries[key].callbacks.push(callback)
-      else this._queries[key] = {
-        components,
-        entities,
-        callbacks: [callback]
-      }
+      if (!!this._queries[key]) this._queries[key].subscriptions.push(callback)
+      else this._queries[key] = { components, entities, subscriptions: [callback], changeHandlers: [] }
       if (emit) callback(entities)
       return () => {
         if (!!this._queries[key]) {
-          this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
+          this._queries[key].subscriptions.splice(this._queries[key].subscriptions.indexOf(callback), 1)
         }
       }
     }
   }
 
-  public unsubscribe(components: IComponent<unknown>[], callback: QueryCallback): void {
+  public handleChange(components: IComponent<unknown>[], callback: ChangeCallback<unknown>): () => void {
+    return this.makeChangeHandler(components)(callback)
+  }
+
+  public makeChangeHandler(components: IComponent<unknown>[]): (cb: ChangeCallback<unknown>) => () => void {
     const key = this.makeQueryKey(components)
-    if (!!this._queries[key]) {
-      this._queries[key].callbacks.splice(this._queries[key].callbacks.indexOf(callback), 1)
+    return (callback) => {
+      if (!!this._queries[key]) this._queries[key].changeHandlers.push(callback)
+      else this._queries[key] = { components, entities: this.queryWithKey(key, components), subscriptions: [], changeHandlers: [callback] }
+      return () => {
+        if (!!this._queries[key]) {
+          this._queries[key].changeHandlers.splice(this._queries[key].changeHandlers.indexOf(callback), 1)
+        }
+      }
     }
   }
 
-  public updateComponent<T>(entity: Entity, Component: IComponent<T>, update: any | ComponentUpdater<T>): void {
-    entity[Component.name] = typeof update === 'function' ? update(entity[Component.name]) || entity[Component.name] : update
+  public unsubscribe(components: IComponent<unknown>[], callback: EntitiesCallback): void {
+    const key = this.makeQueryKey(components)
+    if (!!this._queries[key]) {
+      this._queries[key].subscriptions.splice(this._queries[key].subscriptions.indexOf(callback), 1)
+    }
+  }
+
+  public deregisterHandler(components: IComponent<unknown>[], callback: ChangeCallback<unknown>): void {
+    const key = this.makeQueryKey(components)
+    if (!!this._queries[key]) {
+      this._queries[key].subscriptions.splice(this._queries[key].changeHandlers.indexOf(callback), 1)
+    }
+  }
+
+  public updateComponent<T>(entity: Entity, Component: IComponent<T>, update: any | ComponentUpdater<T>): T {
+    const _update = this._update(entity, Component, update)
     Object.values(this._queries).forEach(query => {
       if (query.entities.includes(entity)) {
-        query.callbacks.forEach(fn => fn(query.entities))
+        query.subscriptions.forEach(fn => fn(query.entities))
+        query.changeHandlers.forEach(fn => fn(entity, [[Component, _update]]))
       }
     })
+    return _update
+  }
+
+  public updateComponents(entity: Entity, updates: ComponentUpdate<any>[]): any[] {
+    const _updates = updates.map(([Component, update]) => ([Component, this._update(entity, Component, update)])) as [IComponent<any>, any][]
+    Object.values(this._queries).forEach(query => {
+      if (query.entities.includes(entity)) {
+        query.subscriptions.forEach(fn => fn(query.entities))
+        query.changeHandlers.forEach(fn => fn(entity, _updates))
+      }
+    })
+    return _updates
+  }
+
+  private _update<T>(entity: Entity, Component: IComponent<T>, update: any | ComponentUpdater<T>): any {
+    entity[Component.name] = typeof update === 'function' ? update(entity[Component.name]) || entity[Component.name] : update
+    return entity[Component.name]
   }
 }

@@ -258,6 +258,27 @@ test('updating components works, and triggers subscriptions', () => {
   unsub()
 })
 
+test('you can update multiple components', () => {
+  const world = new World()
+
+  class Position extends Component<{ x: number, y: number }> { }
+  class Velocity extends Component<{ x: number, y: number }> { }
+
+  const e1 = world.createEntity(
+    [
+      [Position, { x: 0, y: 0 }],
+      [Velocity, { x: 1, y: 1 }]
+    ]
+  )
+
+  const newPosition = new Position({ x: 1, y: 1 })
+  const newVelocity = new Velocity({ x: 1, y: 1 })
+  world.updateComponents(e1, [[Position, newPosition], [Velocity, newVelocity]])
+
+  expect(getComponent(e1, Position)).toBe(newPosition)
+  expect(getComponent(e1, Velocity)).toBe(newVelocity)
+})
+
 test('you can optionally pass messages to world.run', () => {
   const world = new World()
 
@@ -354,6 +375,31 @@ test('you can subscribe to entity updates', () => {
   world.updateComponent(e1, Counter, (c) => c.counter++)
 
   expect(subscription).toHaveBeenCalledTimes(4)
+
+  unsub()
+})
+
+test('you can register change handlers that that trigger with entity changed and a list of changes', () => {
+  const world = new World()
+
+  class Position extends Component<{ x: number, y: number }> { }
+  class Velocity extends Component<{ x: number, y: number }> { }
+
+  const e1 = world.createEntity(
+    [
+      [Position, { x: 0, y: 0 }],
+      [Velocity, { x: 1, y: 1 }]
+    ]
+  )
+
+  const subscription = jest.fn()
+
+  const unsub = world.handleChange([Position], subscription)
+
+  const newPosition = new Position({ x: 1, y: 1 })
+  world.updateComponent(e1, Position, newPosition)
+
+  expect(subscription).toHaveBeenLastCalledWith(e1, [[Position, newPosition]])
 
   unsub()
 })
