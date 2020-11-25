@@ -1,0 +1,66 @@
+{
+  "name": "wecs",
+  "version": "4.0.0",
+  "license": "MIT",
+  "module": "dist/wecs.esm.js",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "keywords": [
+    "ecs",
+    "entity component system",
+    "gamedev"
+  ],
+  "author": "Sam McCord <sam.mccord@protonmail.com>",
+  "bugs": {
+    "url": "https://github.com/sammccord/wecs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sammccord/wecs.git"
+  },
+  "scripts": {
+    "dev": "tsdx watch --verbose --noClean",
+    "build": "tsdx build",
+    "test": "tsdx test",
+    "lint": "tsdx lint",
+    "prepare": "tsdx build",
+    "size": "size-limit",
+    "analyze": "size-limit --why"
+  },
+  "peerDependencies": {},
+  "devDependencies": {
+    "@size-limit/preset-small-lib": "^4.9.0",
+    "husky": "^4.3.0",
+    "size-limit": "^4.9.0",
+    "tsdx": "^0.14.1",
+    "tslib": "^2.0.3",
+    "typescript": "^4.1.2"
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "size-limit": [
+    {
+      "path": "dist/wecs.cjs.production.min.js",
+      "limit": "10 KB"
+    },
+    {
+      "path": "dist/wecs.esm.js",
+      "limit": "10 KB"
+    }
+  ],
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsdx lint"
+    }
+  }
+}
