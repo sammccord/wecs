@@ -1,7 +1,7 @@
 type Entity = { [componentName: string]: any }
 
 export interface IComponent<T> {
-  new (...args: any): T
+  new (...args: any[]): T
 }
 
 export type EntitiesCallback = (entities: Entity[]) => void
@@ -104,7 +104,7 @@ export class World {
         components,
         entities,
         subscriptions: [],
-        changeHandlers: [],
+        changeHandlers: []
       }
     return entities
   }
@@ -181,7 +181,7 @@ export class World {
       components,
       entities: [],
       subscriptions: [],
-      changeHandlers: [],
+      changeHandlers: []
     }
   }
 
@@ -237,7 +237,7 @@ export class World {
           components,
           entities,
           subscriptions: [callback],
-          changeHandlers: [],
+          changeHandlers: []
         }
       if (emit) callback(entities)
       return () => {
@@ -269,7 +269,7 @@ export class World {
           components,
           entities: this.queryWithKey(key, components),
           subscriptions: [],
-          changeHandlers: [callback],
+          changeHandlers: [callback]
         }
       return () => {
         if (!!this.queries[key]) {
@@ -329,7 +329,7 @@ export class World {
   ): [IComponent<unknown>, unknown][] {
     const _updates = updates.map(([Component, update]) => [
       Component,
-      this._update(entity, Component, update),
+      this._update(entity, Component, update)
     ]) as [IComponent<{}>, {}][]
     Object.values(this.queries).forEach(query => {
       if (query.entities.includes(entity)) {

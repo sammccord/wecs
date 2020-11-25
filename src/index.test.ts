@@ -48,7 +48,7 @@ test('getting components works', () => {
 
   const e = world.createEntity([
     [Counter, 0],
-    [OtherComponent, 0],
+    [OtherComponent, 0]
   ])
 
   expect(getComponent(e, Counter).counter).toBe(0)
@@ -142,7 +142,7 @@ test('removing components works', () => {
 
   const e = world.createEntity([
     [Counter, 0],
-    [OtherComponent, 1],
+    [OtherComponent, 1]
   ])
 
   world.run()
@@ -204,7 +204,7 @@ test('entities are deleted when all non-ID components are removed', () => {
 
   const e = world.createEntity([
     [Counter, 0],
-    [ID, { id: '1' }],
+    [ID, { id: '1' }]
   ])
 
   expect(Object.values((world as any).entities).length).toBe(1)
@@ -265,14 +265,14 @@ test('you can update multiple components', () => {
 
   const e1 = world.createEntity([
     [Position, { x: 0, y: 0 }],
-    [Velocity, { x: 1, y: 1 }],
+    [Velocity, { x: 1, y: 1 }]
   ])
 
   const newPosition = new Position({ x: 1, y: 1 })
   const newVelocity = new Velocity({ x: 1, y: 1 })
   world.updateComponents(e1, [
     [Position, newPosition],
-    [Velocity, newVelocity],
+    [Velocity, newVelocity]
   ])
 
   expect(getComponent(e1, Position).get()).toMatchObject({ x: 1, y: 1 })
@@ -305,7 +305,7 @@ test('you can configure lifecycle hooks', () => {
   const onAfter = jest.fn()
   const world = new World({
     onAfter,
-    onBefore,
+    onBefore
   })
 
   class Counter {
@@ -372,7 +372,7 @@ test('you can register change handlers that that trigger with entity changed and
 
   const e1 = world.createEntity([
     [Position, { x: 0, y: 0 }],
-    [Velocity, { x: 1, y: 1 }],
+    [Velocity, { x: 1, y: 1 }]
   ])
 
   const subscription = jest.fn()
