@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "5.1.0-canary.1",
+  "version": "5.1.0-canary.2",
   "license": "MIT",
   "type": "module",
   "source": "lib/index.ts",
@@ -12,8 +12,7 @@
   "exports": {
     "require": "./dist/index.cjs",
     "import": "./dist/index.module.js",
-    "default": "./dist/index.module.js",
-    "deno": "./lib/index.ts"
+    "default": "./dist/index.module.js"
   },
   "files": [
     "dist"
