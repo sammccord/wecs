@@ -1,12 +1,19 @@
 {
   "name": "wecs",
-  "version": "5.0.0",
+  "version": "5.1.0-canary",
   "license": "MIT",
-  "main": "dist/index.js",
+  "type": "module",
+  "source": "lib/index.ts",
+  "main": "./dist/index.cjs",
   "umd:main": "dist/index.umd.js",
-  "module": "dist/index.m.js",
-  "esmodule": "dist/index.modern.js",
-  "types": "dist/index.d.ts",
+  "module": "./dist/index.module.js",
+  "unpkg": "./dist/index.umd.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.module.js",
+    "default": "./dist/index.module.js"
+  },
   "files": [
     "dist"
   ],
@@ -39,7 +46,7 @@
   "devDependencies": {
     "@types/jest": "^26.0.15",
     "jest": "^26.6.3",
-    "microbundle": "^0.12.4",
+    "microbundle": "^0.13.3",
     "ts-jest": "^26.4.4",
     "typescript": "^4.1.2"
   }

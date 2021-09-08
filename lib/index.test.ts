@@ -1,4 +1,4 @@
-import { World, getComponent, Component, ID, hasComponent, getID } from '../src'
+import { World, getComponent, Component, ID, hasComponent, getID } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
