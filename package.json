@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "5.1.0-canary.2",
+  "version": "5.1.0",
   "license": "MIT",
   "type": "module",
   "source": "lib/index.ts",
