@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "5.1.1",
+  "version": "5.1.2",
   "license": "MIT",
   "type": "module",
   "source": "lib/index.ts",
@@ -15,7 +15,8 @@
     "default": "./dist/index.module.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "lib"
   ],
   "engines": {
     "node": ">=10"
@@ -36,6 +37,7 @@
   "scripts": {
     "build": "microbundle",
     "dev": "microbundle watch",
+    "prepare": "npm run build",
     "test": "jest"
   },
   "prettier": {
