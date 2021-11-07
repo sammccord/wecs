@@ -1,4 +1,4 @@
-import { World, getComponent, Component, ID, hasComponent, getID } from './index'
+import { World, hasComponents, getComponent, Component, ID, hasComponent, getID } from './index'
 
 test('basic ecs functionality works', () => {
   const world = new World()
@@ -21,6 +21,7 @@ test('basic ecs functionality works', () => {
   const e = world.createEntity([[Counter, 0]])
 
   expect(hasComponent(e, Counter)).toBe(true)
+  expect(hasComponents(e, [Counter])).toBe(true)
 
   world.run()
 
@@ -46,7 +47,7 @@ test('getting components works', () => {
     }
   }
 
-  const e = world.createEntity([
+  const e = world.createEntity<Counter | OtherComponent>([
     [Counter, 0],
     [OtherComponent, 0]
   ])
@@ -172,8 +173,8 @@ test('all entities should have ID components', () => {
 
   const e = world.createEntity([[Counter, 0]])
 
-  expect(typeof e.ID._.id).toBe('string')
-  expect(e.ID._.id.length).toBeGreaterThan(0)
+  expect(typeof getID(e)).toBe('string')
+  expect(getID(e).length).toBeGreaterThan(0)
 })
 
 test('you can pass an ID function to make your own ids', () => {
@@ -188,8 +189,8 @@ test('you can pass an ID function to make your own ids', () => {
 
   const e = world.createEntity([[Counter, 0]])
 
-  expect(typeof e.ID._.id).toBe('string')
-  expect(e.ID._.id).toEqual('cool')
+  expect(typeof getID(e)).toBe('string')
+  expect(getID(e)).toBe('cool')
 })
 
 test('entities are deleted when all non-ID components are removed', () => {
@@ -202,7 +203,7 @@ test('entities are deleted when all non-ID components are removed', () => {
     }
   }
 
-  const e = world.createEntity([
+  const e = world.createEntity<Counter | ID>([
     [Counter, 0],
     [ID, { id: '1' }]
   ])
@@ -235,13 +236,13 @@ test('updating components works, and triggers subscriptions', () => {
 
   world.register(System, [Counter])
 
-  const e = world.createEntity([[Counter, 0]])
+  const e = world.createEntity<Counter>([[Counter, 0]])
 
   const subscription = jest.fn()
 
   const unsub = world.subscribe([Counter], subscription)
 
-  world.updateComponent(e, Counter, (c: any) => {
+  world.updateComponent(e, Counter, (c) => {
     c.counter++
   })
 
@@ -258,12 +259,13 @@ test('updating components works, and triggers subscriptions', () => {
 })
 
 test('you can update multiple components', () => {
-  const world = new World()
 
   class Position extends Component<{ x: number; y: number }> {}
   class Velocity extends Component<{ x: number; y: number }> {}
 
-  const e1 = world.createEntity([
+  const world = new World()
+
+  const e1 = world.createEntity<Position | Velocity>([
     [Position, { x: 0, y: 0 }],
     [Velocity, { x: 1, y: 1 }]
   ])
@@ -357,7 +359,9 @@ test('you can subscribe to entity updates', () => {
 
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
-  world.updateComponent(e1, Counter, (c: any) => c.counter++)
+  world.updateComponent(e1, Counter, (c) => {
+    c.counter++
+  })
 
   expect(subscription).toHaveBeenCalledTimes(4)
 
@@ -419,7 +423,9 @@ test('you can subscribe using a reusable factory function', () => {
 
   expect(subscription).toHaveBeenLastCalledWith([e1])
 
-  world.updateComponent(e1, Counter, (c: any) => c.counter++)
+  world.updateComponent(e1, Counter, (c) => {
+    c.counter++
+  })
 
   expect(subscription).toHaveBeenCalledTimes(4)
 
