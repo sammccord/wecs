@@ -20,7 +20,7 @@ export class Component<T> {
     return this._
   }
 }
-export class ID extends Component<{ id: string }> {}
+export class ID extends Component<{ id: string | number }> {}
 
 export interface BaseEntity {
   ID: ID
@@ -143,12 +143,19 @@ export class World {
     if (Object.keys(entity).length === 1) delete this.entities[getID(entity)]
   }
 
-  public addComponent<Component>(entity: Entity<Component>, component: IComponent<Component>, ...args: any[]) {
+  public addComponent<Component>(
+    entity: Entity<Component>,
+    component: IComponent<Component>,
+    ...args: any[]
+  ) {
     entity[component.name] = new component(...args)
     this._handleAddCallbacks(entity)
   }
 
-  public addComponents<Components>(entity: Entity<Components>, components: [IComponent<Components>, ...any[]][]) {
+  public addComponents<Components>(
+    entity: Entity<Components>,
+    components: [IComponent<Components>, ...any[]][]
+  ) {
     if (!components.length) return
     components.forEach(([component, ...args]) => {
       entity[component.name] = new component(...args)
@@ -345,7 +352,10 @@ export class World {
 
   public updateComponents<Components>(
     entity: Entity<Components>,
-    updates: [IComponent<Components>, Components | ComponentUpdater<Components>][]
+    updates: [
+      IComponent<Components>,
+      Components | ComponentUpdater<Components>
+    ][]
   ): [IComponent<Components>, Components][] {
     const _updates = updates.map(([Component, update]) => [
       Component,
@@ -365,9 +375,10 @@ export class World {
     component: IComponent,
     update: Component | ComponentUpdater<Component>
   ): Component {
-    return entity[component.name] =
+    return (entity[component.name] =
       typeof update === 'function'
-        ? (update as ComponentUpdater<Component>)(entity[component.name]) || entity[component.name]
-        : update
+        ? (update as ComponentUpdater<Component>)(entity[component.name]) ||
+          entity[component.name]
+        : update)
   }
 }

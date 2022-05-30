@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "license": "MIT",
   "type": "module",
   "source": "lib/index.ts",
