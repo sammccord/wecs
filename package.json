@@ -1,25 +1,21 @@
 {
   "name": "wecs",
-  "version": "6.1.0",
+  "version": "7.0.0-canary",
   "license": "MIT",
   "type": "module",
-  "source": "lib/index.ts",
-  "main": "./dist/index.cjs",
-  "umd:main": "dist/index.umd.js",
-  "module": "./dist/index.module.js",
-  "unpkg": "./dist/index.umd.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
-    "require": "./dist/index.cjs",
-    "import": "./dist/index.module.js",
-    "default": "./dist/index.module.js"
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.umd.js"
+    }
   },
   "files": [
-    "dist",
-    "lib"
+    "dist"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=16"
   },
   "keywords": [
     "ecs",
@@ -35,10 +31,10 @@
     "url": "git+https://github.com/sammccord/wecs.git"
   },
   "scripts": {
-    "build": "microbundle",
-    "dev": "microbundle watch",
-    "prepare": "npm run build",
-    "test": "jest --config jest.config.cjs"
+    "build": "NODE_ENV=prodution vite build && tsc --emitDeclarationOnly --declaration",
+    "dev": "vite build --watch",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "vitest"
   },
   "prettier": {
     "printWidth": 80,
@@ -46,11 +42,8 @@
     "singleQuote": true
   },
   "devDependencies": {
-    "@types/jest": "^26.0.24",
-    "jest": "^27.3.1",
-    "microbundle": "^0.13.3",
-    "ts-jest": "^27.0.7",
-    "ts-node": "^10.4.0",
-    "typescript": "^4.4.4"
+    "typescript": "^4.4.4",
+    "vite": "^4.0.4",
+    "vitest": "^0.26.3"
   }
 }
