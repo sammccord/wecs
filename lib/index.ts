@@ -1,384 +1,376 @@
-export interface IComponent<T = any> {
-  new (...args: any[]): T
-}
-export type ComponentUpdater<T> = (value: T) => T | void
-export type ComponentUpdate<T> = [IComponent<T>, T]
+export type ID = number | string | bigint
 
-export class Component<T> {
-  protected _: T
-  constructor(value: T) {
-    this._ = value
-  }
-  public get(): T {
-    return this._
-  }
-  public find<V>(key: string): V {
-    return (this._ as any)[key]
-  }
-  public set(value: T): T {
-    this._ = { ...this._, ...value }
-    return this._
-  }
-}
-export class ID extends Component<{ id: string | number }> {}
+export type Component<E> = keyof E
+export type ComponentUpdater<T> = T | ((value: T) => T | void)
+export type ComponentUpdaters<E, C extends keyof E> = [
+  C,
+  ComponentUpdater<E[C]>
+]
+export type ComponentUpdate<E, C extends keyof E> = [C, E[C]]
 
 export interface BaseEntity {
-  ID: ID
+  id: ID | undefined
 }
 
-export type Entity<Components = any> = BaseEntity & {
-  [componentName: string]: Components
-}
-
-export type EntitiesCallback<Components> = (
-  entities: Entity<Components>[]
-) => void
-export type ChangeCallback<Components> = (
-  entity: Entity<Components>,
-  updates: ComponentUpdate<Components>[]
+export type EntitiesCallback<Entity> = (entities: Set<Entity>) => void
+export type ChangeCallback<Entity> = (
+  entity: Entity,
+  updates: ComponentUpdate<Entity, Component<Entity>>[]
 ) => void
 
-interface Query<Components> {
-  components: IComponent<Components>[]
-  entities: Entity<Components>[]
-  subscriptions: EntitiesCallback<Components>[]
-  changeHandlers: ChangeCallback<Components>[]
+interface Query<Entity extends {} = any> {
+  components: (keyof Entity)[]
+  exclude?: (keyof Entity)[]
+  entities: Set<Entity>
+  subscriptions: Set<EntitiesCallback<Entity>>
+  changeHandlers: Set<ChangeCallback<Entity>>
 }
 
-export interface Config {
-  parallel?: boolean
-  id?: () => string
-  onBefore?: (...args: any[]) => Promise<void>
-  onAfter?: (...args: any[]) => Promise<void>
+export interface Config<Entity> {
+  getId: (e: Entity) => ID
+  parallel: boolean
+  asyncUpdates: boolean
+  generateId: () => ID
+  onBefore: (...args: any[]) => void | Promise<void>
+  onAfter: (...args: any[]) => void | Promise<void>
 }
 
-export function getID<Components>(entity: Entity<Components>): string {
-  return (entity[ID.name] as any)._.id
-}
-
-export function getComponent<Component>(
-  entity: Entity<Component>,
-  component: IComponent<Component>
-): Component {
-  return entity[component.name]
-}
-
-export function hasComponent<Component>(
+export function getComponent<Entity extends {}, C extends keyof Entity>(
   entity: Entity,
-  components: IComponent<Component>
-) {
-  return !!entity[components.name]
+  component: C
+): Entity[C] {
+  return entity[component]
 }
 
-export function hasComponents<Components>(
+export function hasComponent<Entity extends {} = any>(
   entity: Entity,
-  components: IComponent<Components>[]
+  component: Component<Entity>
 ) {
-  return components.every((c) => !!entity[c.name])
+  return entity[component] !== undefined
 }
 
-const ceil = 0x10000
-function defaultIDGenerator() {
-  return Math.floor((1 + Math.random()) * ceil)
-    .toString(16)
-    .substring(1)
+export function hasSomeComponents<Entity extends {} = any>(
+  entity: Entity,
+  components: (keyof Entity)[]
+): boolean {
+  return components.some((c) => entity[c] !== undefined)
 }
 
-export function makeQueryKey(components: IComponent[]): string {
-  return components
-    .map((c) => c.name)
-    .sort()
-    .join('-')
+export function hasComponents<Entity extends {} = any>(
+  entity: Entity,
+  components: (keyof Entity)[]
+): boolean {
+  return components.every((c) => entity[c] !== undefined)
 }
 
-export class World {
-  protected config: Config = { id: defaultIDGenerator }
+export function generateId() {
+  return crypto.randomUUID()
+}
+
+export function makeQueryKey<Entity extends {} = any>(
+  components: (keyof Entity)[]
+): string {
+  return components.sort().join()
+}
+
+export class World<Entity extends {} = any> {
+  protected config: Config<Entity> = {
+    getId: (e: Entity) => (e as any).id,
+    generateId,
+    parallel: false,
+    asyncUpdates: false,
+    onBefore: () => undefined,
+    onAfter: () => undefined,
+  }
   protected systems: [Function, string][] = []
-  protected entities: { [id: string]: Entity<unknown> } = {}
-  protected queries: { [key: string]: Query<unknown> } = {}
+  protected entities: Map<ID, Entity> = new Map()
+  protected queries: Map<string, Query<Entity>> = new Map()
 
-  constructor(config?: Config) {
+  constructor(config?: Partial<Config<Entity>>) {
     this.config = { ...this.config, ...config }
   }
 
-  protected queryWithKey<Components>(
+  protected queryWithKey(
     key: string,
-    components: IComponent<Components>[],
-    persist?: Boolean
-  ): Entity<Components>[] {
-    if (this.queries[key])
-      return (this.queries[key] as Query<Components>).entities
-    const entities = Object.values(this.entities).filter((e) =>
-      hasComponents(e, components)
-    )
-    if (persist)
-      this.queries[key] = {
+    components: Component<Entity>[],
+    opts: {
+      exclude?: Component<Entity>[]
+      persist?: Boolean
+    } = {}
+  ): Set<Entity> {
+    if (this.queries.has(key)) return this.queries.get(key)!.entities
+    const entities = new Set<Entity>()
+    for (const entity of this.entities.values()) {
+      if (opts.exclude && hasSomeComponents(entity, opts.exclude)) continue
+      if (hasComponents(entity, components)) entities.add(entity)
+    }
+    if (opts.persist)
+      this.queries.set(key, {
         components,
         entities,
-        subscriptions: [],
-        changeHandlers: [],
-      }
-    return entities as Entity<Components>[]
+        exclude: opts.exclude,
+        subscriptions: new Set(),
+        changeHandlers: new Set(),
+      })
+
+    return entities
   }
 
   private _handleAddCallbacks(e: Entity) {
-    Object.values(this.queries).forEach((query) => {
-      if (!query.entities.includes(e)) {
+    for (let query of this.queries.values()) {
+      if (!query.entities.has(e)) {
+        if (query.exclude && hasSomeComponents(e, query.exclude)) continue
         if (hasComponents(e, query.components)) {
-          query.entities.push(e)
-          query.subscriptions.forEach((fn) => fn(query.entities))
+          query.entities.add(e)
+          for (let sub of query.subscriptions) {
+            sub(query.entities)
+          }
         }
       }
-    })
-  }
-
-  private _handleRemoveCallbacks(entity: Entity) {
-    Object.values(this.queries).forEach((query) => {
-      if (!query.entities.includes(entity)) return
-      if (!hasComponents(entity, query.components)) {
-        query.entities.splice(query.entities.indexOf(entity), 1)
-        query.subscriptions.forEach((fn) => fn(query.entities))
-      }
-    })
-    if (Object.keys(entity).length === 1) delete this.entities[getID(entity)]
-  }
-
-  public addComponent<Component>(
-    entity: Entity<Component>,
-    component: IComponent<Component>,
-    ...args: any[]
-  ) {
-    entity[component.name] = new component(...args)
-    this._handleAddCallbacks(entity)
-  }
-
-  public addComponents<Components>(
-    entity: Entity<Components>,
-    components: [IComponent<Components>, ...any[]][]
-  ) {
-    if (!components.length) return
-    components.forEach(([component, ...args]) => {
-      entity[component.name] = new component(...args)
-    })
-    this._handleAddCallbacks(entity)
-  }
-
-  public createEntity<Components>(
-    components: [IComponent<Components>, ...any[]][]
-  ): Entity<Components> {
-    const entity: any = {}
-    components.forEach(([Constructor, ...args]) => {
-      entity[Constructor.name] = new Constructor(...args)
-    })
-    if (!entity[ID.name]) entity[ID.name] = new ID({ id: this.config.id!() })
-    this.entities[getID(entity)] = entity
-    Object.values(this.queries).forEach((query) => {
-      if (hasComponents(entity, query.components)) query.entities.push(entity)
-      query.subscriptions.forEach((fn) => fn(query.entities))
-    })
-    return entity as Entity<Components>
-  }
-
-  public get<Components>(id: string): Entity<Components> {
-    return this.entities[id] as unknown as Entity<Components>
-  }
-
-  public query<Components>(
-    components: IComponent[],
-    cache?: Boolean
-  ): Entity<Components>[] {
-    const key = makeQueryKey(components)
-    return this.queryWithKey(key, components, cache)
-  }
-
-  public register(system: Function, components: IComponent[]): void {
-    const key = makeQueryKey(components)
-    this.systems.push([system, key])
-    this.queries[key] = {
-      components,
-      entities: [],
-      subscriptions: [],
-      changeHandlers: [],
     }
   }
 
-  public removeComponent(entity: Entity, component: IComponent) {
-    if (!component || component.name === ID.name) return
-    delete entity[component.name]
-    this._handleRemoveCallbacks(entity)
+  private _handleRemoveCallbacks(entity: Entity) {
+    for (let query of this.queries.values()) {
+      if (query.entities.has(entity)) {
+        if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
+        if (!hasComponents(entity, query.components)) {
+          query.entities.delete(entity)
+          for (let sub of query.subscriptions) {
+            sub(query.entities)
+          }
+        }
+      }
+    }
+    if ((entity as any).id && Object.keys(entity).length === 1) {
+      this.entities.delete(this.config.getId(entity))
+    } else if (Object.keys(entity).length === 0)
+      this.entities.delete(this.config.getId(entity))
   }
 
-  public removeComponents(entity: Entity, components: IComponent[]) {
-    if (!components || !components.length) return
-    components.forEach((component) => {
-      if (component.name === ID.name) return
-      delete entity[component.name]
-    })
+  public addComponents(entity: Entity, components: Partial<Entity>) {
+    Object.assign(entity, components)
+    this._handleAddCallbacks(entity)
+  }
+
+  public createEntity(entity: Entity): Entity {
+    const id =
+      this.config.getId(entity) ||
+      ((entity as any).id = this.config.generateId())
+    this.entities.set(id, entity)
+
+    for (let query of this.queries.values()) {
+      if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
+      if (hasComponents(entity, query.components)) {
+        query.entities.add(entity)
+        for (let sub of query.subscriptions) {
+          sub(query.entities)
+        }
+      }
+    }
+
+    return entity
+  }
+
+  public get(id: ID): Entity | undefined {
+    return this.entities.get(id)
+  }
+
+  public query(
+    components: Component<Entity>[],
+    opts: {
+      exclude?: Component<Entity>[]
+      persist?: Boolean
+    } = {}
+  ): Set<Entity> {
+    return this.queryWithKey(makeQueryKey(components), components, opts)
+  }
+
+  public register(
+    system: Function,
+    components: Component<Entity>[],
+    exclude?: Component<Entity>[]
+  ): void {
+    const key = makeQueryKey(components)
+    this.systems.push([system, key])
+    this.queryWithKey(key, components, { exclude, persist: true })
+  }
+
+  public removeComponents(
+    entity: Entity,
+    components: Component<Entity>[] = []
+  ) {
+    if (!components.length) return
+    for (let c of components) {
+      delete entity[c]
+    }
     this._handleRemoveCallbacks(entity)
   }
 
   public async run<Args extends readonly any[]>(...args: Args): Promise<void> {
     if (this.config.onBefore) await this.config.onBefore(...args)
     if (this.config.parallel) {
-      this.systems.forEach(([system, queryKey]) => {
-        if (args) system(...args, this.queries[queryKey].entities)
-        else system(this.queries[queryKey].entities)
-      })
+      await Promise.all(
+        this.systems.map(async ([system, key]) => {
+          if (args) await system(...args, this.queries.get(key)!.entities)
+          else await system(this.queries.get(key)!.entities)
+        })
+      )
     } else {
-      for (let [system, queryKey] of this.systems) {
-        if (args) await system(...args, this.queries[queryKey].entities)
-        else await system(this.queries[queryKey].entities)
+      for (let [system, key] of this.systems) {
+        if (args) system(...args, this.queries.get(key)!.entities)
+        else system(this.queries.get(key)!.entities)
       }
     }
     if (this.config.onAfter) await this.config.onAfter(...args)
   }
 
-  public subscribe<Components>(
-    components: IComponent<Components>[],
-    callback: EntitiesCallback<Components>,
-    emit?: boolean
+  public subscribe(
+    components: Component<Entity>[],
+    callback: EntitiesCallback<Entity>,
+    opts: { emit?: boolean; exclude?: Component<Entity>[] } = {}
   ): () => void {
-    return this.makeSubscription<Components>(components, emit)(callback)
+    return this.makeSubscription(components, opts)(callback)
   }
 
-  public makeSubscription<Components>(
-    components: IComponent<Components>[],
-    emit?: boolean
-  ): (cb: EntitiesCallback<Components>) => () => void {
+  public makeSubscription(
+    components: Component<Entity>[],
+    opts: { emit?: boolean; exclude?: Component<Entity>[] } = {}
+  ): (cb: EntitiesCallback<Entity>) => () => void {
     const key = makeQueryKey(components)
     return (callback) => {
-      const entities = this.queryWithKey<Components>(key, components)
-      if (!!this.queries[key])
-        (
-          this.queries[key].subscriptions as EntitiesCallback<Components>[]
-        ).push(callback)
-      else
-        this.queries[key] = {
+      let entities: Set<Entity>
+      if (this.queries.has(key)) {
+        this.queries.get(key)?.subscriptions.add(callback)
+      } else
+        this.queries.set(key, {
           components,
-          entities,
-          subscriptions: [callback as any],
-          changeHandlers: [],
-        }
-      if (emit) callback(entities)
+          entities: (entities = this.queryWithKey(key, components)),
+          subscriptions: new Set([callback]),
+          changeHandlers: new Set(),
+        })
+      if (opts.emit) callback(entities! || this.queryWithKey(key, components))
       return () => {
-        if (!!this.queries[key]) {
-          this.queries[key].subscriptions.splice(
-            (
-              this.queries[key].subscriptions as EntitiesCallback<Components>[]
-            ).indexOf(callback),
-            1
-          )
+        if (this.queries.has(key)) {
+          this.queries.get(key)!.subscriptions.delete(callback)
         }
       }
     }
   }
 
-  public handleChange<Components>(
-    components: IComponent<Components>[],
-    callback: ChangeCallback<Components>
+  public handleChange(
+    components: Component<Entity>[],
+    callback: ChangeCallback<Entity>
   ): () => void {
     return this.makeChangeHandler(components)(callback)
   }
 
-  public makeChangeHandler<Components>(
-    components: IComponent<Components>[]
-  ): (cb: ChangeCallback<Components>) => () => void {
+  public makeChangeHandler(
+    components: Component<Entity>[]
+  ): (cb: ChangeCallback<Entity>) => () => void {
     const key = makeQueryKey(components)
     return (callback) => {
-      if (!!this.queries[key])
-        (this.queries[key].changeHandlers as ChangeCallback<Components>[]).push(
-          callback
-        )
-      else
-        this.queries[key] = {
+      if (this.queries.has(key)) {
+        this.queries.get(key)?.changeHandlers.add(callback)
+      } else
+        this.queries.set(key, {
           components,
           entities: this.queryWithKey(key, components),
-          subscriptions: [],
-          changeHandlers: [callback as any],
-        }
+          subscriptions: new Set(),
+          changeHandlers: new Set([callback]),
+        })
       return () => {
-        if (!!this.queries[key]) {
-          this.queries[key].changeHandlers.splice(
-            (
-              this.queries[key].changeHandlers as ChangeCallback<Components>[]
-            ).indexOf(callback),
-            1
-          )
+        if (this.queries.has(key)) {
+          this.queries.get(key)!.changeHandlers.delete(callback)
         }
       }
     }
   }
 
-  public unsubscribe<Components>(
-    components: IComponent[],
-    callback: EntitiesCallback<Components>
+  public unsubscribe(
+    components: Component<Entity>[],
+    callback: EntitiesCallback<Entity>
   ): void {
     const key = makeQueryKey(components)
-    if (!!this.queries[key]) {
-      this.queries[key].subscriptions.splice(
-        this.queries[key].subscriptions.indexOf(callback as any),
-        1
-      )
+    if (this.queries.has(key)) {
+      this.queries.get(key)!.subscriptions.delete(callback)
     }
   }
 
-  public deregisterHandler<Components>(
-    components: IComponent[],
-    callback: ChangeCallback<Components>
+  public unregisterHandler(
+    components: Component<Entity>[],
+    callback: ChangeCallback<Entity>
   ): void {
     const key = makeQueryKey(components)
-    if (!!this.queries[key]) {
-      this.queries[key].subscriptions.splice(
-        this.queries[key].changeHandlers.indexOf(callback as any),
-        1
-      )
+    if (this.queries.has(key)) {
+      this.queries.get(key)!.changeHandlers.delete(callback)
     }
   }
 
-  public updateComponent<Component>(
-    entity: Entity<Component>,
-    Component: IComponent<Component>,
-    update: Component | ComponentUpdater<Component>
-  ): Component {
-    const _update = this._update(entity, Component, update)
-    Object.values(this.queries).forEach((query) => {
-      if (query.entities.includes(entity)) {
-        query.subscriptions.forEach((fn) => fn(query.entities))
-        query.changeHandlers.forEach((fn) => fn(entity, [[Component, _update]]))
-      }
-    })
+  public update(entity: Entity, components: Partial<Entity>): Entity {
+    Object.assign(entity, components)
+    this._handleUpdates(
+      entity,
+      Object.entries(components) as ComponentUpdate<Entity, Component<Entity>>[]
+    )
+    return entity
+  }
+
+  public updateComponent<T extends Component<Entity>>(
+    entity: Entity,
+    component: T,
+    update: ComponentUpdater<Entity[T]>
+  ): Entity[T] {
+    const _update = this._update(entity, component, update)
+    this._handleUpdates(entity, [[component, _update]])
     return _update
   }
 
-  public updateComponents<Components>(
-    entity: Entity<Components>,
-    updates: [
-      IComponent<Components>,
-      Components | ComponentUpdater<Components>
-    ][]
-  ): [IComponent<Components>, Components][] {
-    const _updates = updates.map(([Component, update]) => [
-      Component,
-      this._update(entity, Component, update),
-    ]) as [IComponent<Components>, Components][]
-    Object.values(this.queries).forEach((query) => {
-      if (query.entities.includes(entity)) {
-        query.subscriptions.forEach((fn) => fn(query.entities))
-        query.changeHandlers.forEach((fn) => fn(entity, _updates))
-      }
-    })
+  public updateComponents<C extends keyof Entity>(
+    entity: Entity,
+    updates: ComponentUpdaters<Entity, C>[]
+  ): ComponentUpdate<Entity, C>[] {
+    const _updates = updates.map(([component, update]) => [
+      component,
+      this._update(entity, component, update),
+    ]) as ComponentUpdate<Entity, C>[]
+    this._handleUpdates(entity, _updates)
     return _updates
   }
 
-  private _update<Component>(
-    entity: Entity<Component>,
-    component: IComponent,
-    update: Component | ComponentUpdater<Component>
-  ): Component {
-    return (entity[component.name] =
+  private _update<T extends Component<Entity>>(
+    entity: Entity,
+    component: T,
+    update: ComponentUpdater<Entity[T]>
+  ): Entity[T] {
+    return (entity[component] =
       typeof update === 'function'
-        ? (update as ComponentUpdater<Component>)(entity[component.name]) ||
-          entity[component.name]
+        ? (update as any)(entity[component]) || entity[component]
         : update)
+  }
+
+  private _handleUpdates<C extends keyof Entity>(
+    entity: Entity,
+    updates: ComponentUpdate<Entity, C>[]
+  ) {
+    if (this.config.asyncUpdates)
+      setTimeout(() => this._callUpdateHandlers(entity, updates), 0)
+    else this._callUpdateHandlers(entity, updates)
+  }
+
+  private _callUpdateHandlers<C extends keyof Entity>(
+    entity: Entity,
+    updates: ComponentUpdate<Entity, C>[]
+  ) {
+    for (let query of this.queries.values()) {
+      if (query.entities.has(entity)) {
+        for (let fn of query.subscriptions) {
+          fn(query.entities)
+        }
+        for (let fn of query.changeHandlers) {
+          fn(entity, updates)
+        }
+      }
+    }
   }
 }

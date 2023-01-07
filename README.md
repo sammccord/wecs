@@ -14,7 +14,7 @@
   - [Quick Start](#quick-start)
   - [API](#api)
     - [`World`](#world)
-      - [`constructor(config?: Config)`](#constructorconfig-config--)
+      - [`constructor(config?: Config)`](#constructorconfig-config)
       - [`addComponent<T>(entity: Entity, Component: Component<T>, ...args: any[])`](#addcomponenttentity-entity-component-componentt-args-any)
       - [`addComponents(entity: Entity, components: [Component<unknown>, ...any[]][])`](#addcomponentsentity-entity-components-componentunknown-any)
       - [`createEntity(components: [Component<unknown>, ...any[]][]): Entity`](#createentitycomponents-componentunknown-any-entity)
@@ -26,10 +26,10 @@
       - [`subscribe(components: Component<unknown>[], callback: QueryCallback, emit?: boolean): Function`](#subscribecomponents-componentunknown-callback-querycallback-emit-boolean-function)
       - [`makeSubscription(components: IComponent<unknown>[], emit?: boolean): (cb: QueryCallback) => () => void`](#makesubscriptioncomponents-icomponentunknown-emit-boolean-cb-querycallback----void)
       - [`unsubscribe(components: Component<unknown>[], callback: QueryCallback)`](#unsubscribecomponents-componentunknown-callback-querycallback)
-      - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>)`](#updatecomponenttentity-entity-component-update-any--componentupdatert)
+      - [`updateComponent<T>(entity: Entity, Component, update: any | ComponentUpdater<T>): `](#updatecomponenttentity-entity-component-update-any--componentupdatert-)
     - [`Component<T>`](#componentt)
     - [`ID`](#id)
-    - [`getID(entity: Entity): string`](#getidentity-entity-string)
+    - [`getID(entity: Entity): string | number`](#getidentity-entity-string--number)
     - [`getComponent<T>(entity: Entity, Component: Component<T>): T`](#getcomponenttentity-entity-component-componentt-t)
     - [`hasComponent<T>(entity: Entity, components: Component<T>)`](#hascomponenttentity-entity-components-componentt)
     - [`hasComponents(entity: Entity, components: Component<unknown>[])`](#hascomponentsentity-entity-components-componentunknown)
@@ -358,11 +358,8 @@ import { Component } from 'wecs'
 class Position extends Component<{ x: number, y: number }> { }
 
 const p = new Position({ x: 0, y: 0 })
-console.assert(p.x === 0)
-console.assert(p.y === 0)
-
-// You can easily serialize and reconstruct components this way
-console.assert(p.x === new Position(JSON.parse(JSON.stringify(p))).x)
+console.assert(p.value.x === 0)
+console.assert(p.value.y === 0)
 ```
 
 ### `ID`
@@ -376,18 +373,18 @@ const entity = world.createEntity([Component])
 
 // Creating an entity with a custom ID component is fine too
 const entity = world.createEntity([
-  [ID, { id: 'foo' }]
+  [ID, 'foo']
 ])
 getID(entity) === 'foo'
 ```
 
-### `getID(entity: Entity): string`
+### `getID(entity: Entity): string | number`
 
 Retrieves a given entity's unique identifier from its `ID` component.
 
 ```js
 const entity = world.createEntity([
-  [ID, { id: 'foo' }]
+  [ID, 'foo']
 ])
 getID(entity) === 'foo'
 ```
