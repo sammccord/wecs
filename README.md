@@ -1,5 +1,7 @@
 # `(wee)` Entity Component System
 
+**HEADS UP: Documentation is out of date for v8, these docs are for <8.0.0**
+
 > A **tiny** Entity Component System for Javascript
 
 ## Features
