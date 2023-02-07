@@ -1,10 +1,11 @@
 {
   "name": "wecs",
-  "version": "8.0.0-alpha",
+  "version": "8.0.0-alpha.0",
   "license": "MIT",
   "type": "module",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -32,6 +33,7 @@
   },
   "scripts": {
     "build": "NODE_ENV=prodution vite build && tsc --emitDeclarationOnly --declaration",
+    "benchmark": "ts-node benchmark.ts",
     "clean": "rm -rf dist",
     "dev": "vite build --watch",
     "prepublishOnly": "npm run clean && npm run build",

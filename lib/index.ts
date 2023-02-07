@@ -83,8 +83,16 @@ export class World<Entity extends {} = any> {
     onAfter: () => undefined,
   }
   protected systems: [Function, string][] = []
-  protected entities: Map<ID, Entity> = new Map()
+  protected _entities: Map<ID, Entity> = new Map()
   protected queries: Map<string, Query<Entity>> = new Map()
+
+  public get size() {
+    return this._entities.size
+  }
+
+  public get entities() {
+    return [...this._entities.values()]
+  }
 
   constructor(config?: Partial<Config<Entity>>) {
     this.config = { ...this.config, ...config }
@@ -100,7 +108,7 @@ export class World<Entity extends {} = any> {
   ): Set<Entity> {
     if (this.queries.has(key)) return this.queries.get(key)!.entities
     const entities = new Set<Entity>()
-    for (const entity of this.entities.values()) {
+    for (const entity of this._entities.values()) {
       if (opts.exclude && hasSomeComponents(entity, opts.exclude)) continue
       if (hasComponents(entity, components)) entities.add(entity)
     }
@@ -130,11 +138,11 @@ export class World<Entity extends {} = any> {
     }
   }
 
-  private _handleRemoveCallbacks(entity: Entity) {
+  private _handleRemoveCallbacks(entity: Entity, force = false) {
     for (let query of this.queries.values()) {
       if (query.entities.has(entity)) {
         if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
-        if (!hasComponents(entity, query.components)) {
+        if (force || !hasComponents(entity, query.components)) {
           query.entities.delete(entity)
           for (let sub of query.subscriptions) {
             sub(query.entities)
@@ -142,10 +150,13 @@ export class World<Entity extends {} = any> {
         }
       }
     }
-    if ((entity as any).id && Object.keys(entity).length === 1) {
-      this.entities.delete(this.config.getId(entity))
-    } else if (Object.keys(entity).length === 0)
-      this.entities.delete(this.config.getId(entity))
+    if (
+      force ||
+      Object.keys(entity).length === 0 ||
+      ((entity as any).id && Object.keys(entity).length === 1)
+    ) {
+      this._entities.delete(this.config.getId(entity))
+    }
   }
 
   public addComponents(entity: Entity, components: Partial<Entity>) {
@@ -153,11 +164,12 @@ export class World<Entity extends {} = any> {
     this._handleAddCallbacks(entity)
   }
 
+  public add = this.createEntity.bind(this)
   public createEntity(entity: Entity): Entity {
     const id =
       this.config.getId(entity) ||
       ((entity as any).id = this.config.generateId())
-    this.entities.set(id, entity)
+    this._entities.set(id, entity)
 
     for (let query of this.queries.values()) {
       if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
@@ -168,12 +180,24 @@ export class World<Entity extends {} = any> {
         }
       }
     }
+    return entity
+  }
 
+  public remove(entity: Entity): Entity {
+    this._handleRemoveCallbacks(entity, true)
     return entity
   }
 
   public get(id: ID): Entity | undefined {
-    return this.entities.get(id)
+    return this._entities.get(id)
+  }
+
+  public clear() {
+    this._entities.clear()
+    for (let query of this.queries.values()) {
+      query.entities.clear()
+    }
+    this.systems.length = 0
   }
 
   public query(
