@@ -12,18 +12,23 @@ export interface BaseEntity {
   id: ID | undefined
 }
 
-export type EntitiesCallback<Entity> = (entities: Set<Entity>) => void
-export type ChangeCallback<Entity> = (
+export type EntitiesCallback<Entity> = (
+  entities: Set<Entity>
+) => void | Promise<void> | (() => void)
+export type EntityCallback<Entity> = (
+  entity: Entity
+) => void | Promise<void> | (() => void)
+export type EntityUpdateCallback<Entity> = (
   entity: Entity,
-  updates: ComponentUpdate<Entity, Component<Entity>>[]
-) => void
+  updates?: ComponentUpdate<Entity, Component<Entity>>[]
+) => void | Promise<void> | (() => void)
 
 interface Query<Entity extends {} = any> {
   components: (keyof Entity)[]
   exclude?: (keyof Entity)[]
   entities: Set<Entity>
   subscriptions: Set<EntitiesCallback<Entity>>
-  changeHandlers: Set<ChangeCallback<Entity>>
+  updates: Set<EntityUpdateCallback<Entity>>
 }
 
 export interface Config<Entity> {
@@ -86,16 +91,71 @@ export class World<Entity extends {} = any> {
   protected _entities: Map<ID, Entity> = new Map()
   protected queries: Map<string, Query<Entity>> = new Map()
 
+  protected _onCreate = new Set<EntityCallback<Entity>>()
+  protected _onUpdate = new Set<EntityUpdateCallback<Entity>>()
+  protected _onRemove = new Set<EntityCallback<Entity>>()
+
   public get size() {
     return this._entities.size
   }
 
   public get entities() {
-    return [...this._entities.values()]
+    return this._entities.values()
   }
 
   constructor(config?: Partial<Config<Entity>>) {
     this.config = { ...this.config, ...config }
+
+    this._onCreate.add(async (entity) => {
+      this.queries.forEach(async (query) => {
+        if (query.exclude && hasSomeComponents(entity, query.exclude)) return
+        if (hasComponents(entity, query.components)) {
+          query.entities.add(entity)
+          query.subscriptions.forEach(async (sub) => {
+            sub(query.entities)
+          })
+        }
+      })
+    })
+
+    this._onUpdate.add(async (entity) => {
+      this.queries.forEach(async (query) => {
+        let executeSubs = false
+        // should be removed?
+        if (query.entities.has(entity)) {
+          if (query.exclude && hasSomeComponents(entity, query.exclude)) {
+            executeSubs = true
+            query.entities.delete(entity)
+          }
+        } else {
+          // should be added?
+          if (query.exclude && hasSomeComponents(entity, query.exclude)) {
+          } else if (hasComponents(entity, query.components)) {
+            executeSubs = true
+            query.entities.add(entity)
+          }
+        }
+        if (executeSubs) query.subscriptions.forEach((cb) => cb(query.entities))
+      })
+    })
+
+    this._onUpdate.add(async (entity, updates) => {
+      if (!updates) return
+      this.queries.forEach(async (query) => {
+        query.updates.forEach(async (cb) => cb(entity, updates))
+      })
+    })
+
+    this._onRemove.add(async (entity) => {
+      this.queries.forEach(async (query) => {
+        if (query.entities.has(entity)) {
+          query.entities.delete(entity)
+          query.subscriptions.forEach(async (sub) => {
+            sub(query.entities)
+          })
+        }
+      })
+    })
   }
 
   protected queryWithKey(
@@ -118,45 +178,10 @@ export class World<Entity extends {} = any> {
         entities,
         exclude: opts.exclude,
         subscriptions: new Set(),
-        changeHandlers: new Set(),
+        updates: new Set(),
       })
 
     return entities
-  }
-
-  private _handleAddCallbacks(e: Entity) {
-    for (let query of this.queries.values()) {
-      if (!query.entities.has(e)) {
-        if (query.exclude && hasSomeComponents(e, query.exclude)) continue
-        if (hasComponents(e, query.components)) {
-          query.entities.add(e)
-          for (let sub of query.subscriptions) {
-            sub(query.entities)
-          }
-        }
-      }
-    }
-  }
-
-  private _handleRemoveCallbacks(entity: Entity, force = false) {
-    for (let query of this.queries.values()) {
-      if (query.entities.has(entity)) {
-        if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
-        if (force || !hasComponents(entity, query.components)) {
-          query.entities.delete(entity)
-          for (let sub of query.subscriptions) {
-            sub(query.entities)
-          }
-        }
-      }
-    }
-    if (
-      force ||
-      Object.keys(entity).length === 0 ||
-      ((entity as any).id && Object.keys(entity).length === 1)
-    ) {
-      this._entities.delete(this.config.getId(entity))
-    }
   }
 
   public addComponents(entity: Entity, components: Partial<Entity>) {
@@ -170,16 +195,7 @@ export class World<Entity extends {} = any> {
       this.config.getId(entity) ||
       ((entity as any).id = this.config.generateId())
     this._entities.set(id, entity)
-
-    for (let query of this.queries.values()) {
-      if (query.exclude && hasSomeComponents(entity, query.exclude)) continue
-      if (hasComponents(entity, query.components)) {
-        query.entities.add(entity)
-        for (let sub of query.subscriptions) {
-          sub(query.entities)
-        }
-      }
-    }
+    this._onCreate.forEach(async (cb) => cb(entity))
     return entity
   }
 
@@ -263,50 +279,53 @@ export class World<Entity extends {} = any> {
   ): (cb: EntitiesCallback<Entity>) => () => void {
     const key = makeQueryKey(components)
     return (callback) => {
-      let entities: Set<Entity>
-      if (this.queries.has(key)) {
+      let query = this.queries.get(key)
+      if (query) {
         this.queries.get(key)?.subscriptions.add(callback)
-      } else
-        this.queries.set(key, {
+      } else {
+        query = {
           components,
-          entities: (entities = this.queryWithKey(key, components)),
+          entities: this.queryWithKey(key, components),
           subscriptions: new Set([callback]),
-          changeHandlers: new Set(),
-        })
-      if (opts.emit) callback(entities! || this.queryWithKey(key, components))
-      return () => {
-        if (this.queries.has(key)) {
-          this.queries.get(key)!.subscriptions.delete(callback)
+          updates: new Set(),
         }
+        this.queries.set(key, query)
+      }
+
+      if (opts.emit)
+        callback(query.entities || this.queryWithKey(key, components))
+      return () => {
+        query?.subscriptions.delete(callback)
       }
     }
   }
 
-  public handleChange(
+  public onUpdate(
     components: Component<Entity>[],
-    callback: ChangeCallback<Entity>
+    callback: EntityUpdateCallback<Entity>
   ): () => void {
-    return this.makeChangeHandler(components)(callback)
+    return this.makeUpdateHandler(components)(callback)
   }
 
-  public makeChangeHandler(
+  public makeUpdateHandler(
     components: Component<Entity>[]
-  ): (cb: ChangeCallback<Entity>) => () => void {
+  ): (cb: EntityUpdateCallback<Entity>) => () => void {
     const key = makeQueryKey(components)
     return (callback) => {
-      if (this.queries.has(key)) {
-        this.queries.get(key)?.changeHandlers.add(callback)
-      } else
-        this.queries.set(key, {
+      let query = this.queries.get(key)
+      if (query) {
+        query.updates.add(callback)
+      } else {
+        query = {
           components,
           entities: this.queryWithKey(key, components),
           subscriptions: new Set(),
-          changeHandlers: new Set([callback]),
-        })
-      return () => {
-        if (this.queries.has(key)) {
-          this.queries.get(key)!.changeHandlers.delete(callback)
+          updates: new Set([callback]),
         }
+        this.queries.set(key, query)
+      }
+      return () => {
+        query?.updates.delete(callback)
       }
     }
   }
@@ -323,12 +342,9 @@ export class World<Entity extends {} = any> {
 
   public unregisterHandler(
     components: Component<Entity>[],
-    callback: ChangeCallback<Entity>
+    callback: EntityUpdateCallback<Entity>
   ): void {
-    const key = makeQueryKey(components)
-    if (this.queries.has(key)) {
-      this.queries.get(key)!.changeHandlers.delete(callback)
-    }
+    this.queries.get(makeQueryKey(components))?.updates.delete(callback)
   }
 
   public update(entity: Entity, components: Partial<Entity>): Entity {
@@ -373,6 +389,21 @@ export class World<Entity extends {} = any> {
         : update)
   }
 
+  private _handleAddCallbacks(e: Entity) {
+    this._onUpdate.forEach(async (cb) => cb(e))
+  }
+
+  private _handleRemoveCallbacks(entity: Entity, force = false) {
+    this._onRemove.forEach(async (cb) => cb(entity))
+    if (
+      force ||
+      Object.keys(entity).length === 0 ||
+      ((entity as any).id && Object.keys(entity).length === 1)
+    ) {
+      this._entities.delete(this.config.getId(entity))
+    }
+  }
+
   private _handleUpdates<C extends keyof Entity>(
     entity: Entity,
     updates: ComponentUpdate<Entity, C>[]
@@ -386,15 +417,6 @@ export class World<Entity extends {} = any> {
     entity: Entity,
     updates: ComponentUpdate<Entity, C>[]
   ) {
-    for (let query of this.queries.values()) {
-      if (query.entities.has(entity)) {
-        for (let fn of query.subscriptions) {
-          fn(query.entities)
-        }
-        for (let fn of query.changeHandlers) {
-          fn(entity, updates)
-        }
-      }
-    }
+    this._onUpdate.forEach(async (cb) => cb(entity, updates))
   }
 }

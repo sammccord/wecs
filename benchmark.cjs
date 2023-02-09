@@ -41,6 +41,7 @@ profile('add', () => {
   return () => {
     for (let i = 0; i < entityCount; i++) {
       world.add({
+        id: i,
         position: { x: 0, y: i, z: 0 },
         velocity: { x: 0, y: 0, z: 0 },
       })
@@ -56,6 +57,7 @@ profile('add (with archetypes)', () => {
   return () => {
     for (let i = 0; i < entityCount; i++) {
       world.add({
+        id: i,
         position: { x: 0, y: i, z: 0 },
         velocity: { x: 0, y: 0, z: 0 },
       })
@@ -70,7 +72,7 @@ heading('Entity Removal')
 // profile('remove (random)', () => {
 //   const world = new World({ parallel: true, asyncUpdates: true })
 //   for (let i = 0; i < entityCount; i++)
-//     world.add({
+//     world.add({ id: i,
 //       position: { x: 0, y: i, z: 0 },
 //       velocity: { x: 0, y: 0, z: 0 },
 //     })
@@ -94,7 +96,7 @@ heading('Entity Removal')
 //   const withVelocity = world.query(['vel'], { persist: true })
 
 //   for (let i = 0; i < entityCount; i++)
-//     world.add({
+//     world.add({ id: i,
 //       position: { x: 0, y: i, z: 0 },
 //       velocity: { x: 0, y: 0, z: 0 },
 //     })
@@ -117,6 +119,7 @@ profile('clear', () => {
   const world = new World({ parallel: true, asyncUpdates: true })
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: 0, y: i, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
     })
@@ -135,6 +138,7 @@ profile('clear (with archetypes)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: 0, y: i, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
     })
@@ -154,6 +158,7 @@ profile('simulate (iterator, world)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
       velocity: { x: 1, y: 2, z: 3 },
     })
@@ -178,6 +183,7 @@ profile('simulate (iterator, archetype)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
       velocity: { x: 1, y: 2, z: 3 },
     })
@@ -201,6 +207,7 @@ profile('simulate (iterator, array)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
       velocity: { x: 1, y: 2, z: 3 },
     })
@@ -224,6 +231,7 @@ profile('simulate (for, array)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
       velocity: { x: 1, y: 2, z: 3 },
     })
@@ -252,7 +260,7 @@ profile('simulate (for, array)', () => {
 //   const positiveX = world.where((e) => e.position.x > 0).connect()
 
 //   for (let i = 0; i < entityCount; i++)
-//     world.add({
+//     world.add({ id: i,
 //       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
 //       velocity: { x: 1, y: 2, z: 3 },
 //     })
@@ -277,6 +285,7 @@ profile('value predicate check (filter 👎)', () => {
 
   for (let i = 0; i < entityCount; i++)
     world.add({
+      id: i,
       position: { x: Math.random() * 200 - 100, y: i, z: 0 },
       velocity: { x: 1, y: 2, z: 3 },
     })

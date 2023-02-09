@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "NODE_ENV=prodution vite build && tsc --emitDeclarationOnly --declaration",
-    "benchmark": "ts-node benchmark.ts",
+    "benchmark": "node benchmark.cjs",
     "clean": "rm -rf dist",
     "dev": "vite build --watch",
     "prepublishOnly": "npm run clean && npm run build",
