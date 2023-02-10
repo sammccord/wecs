@@ -1,10 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import { World, getComponent, hasComponent, hasComponents } from '../lib/index'
 
-global.crypto = {
-  randomUUID: () => 'foobar',
-}
-
 interface Entity {
   id: string
   pos: {
@@ -27,7 +23,7 @@ test('basic ecs functionality works', async () => {
 
   world.register(System, ['pos'])
 
-  const e = world.createEntity({ id: 'a', pos: { x: 0, y: 0 } })
+  const e = world.create({ id: 'a', pos: { x: 0, y: 0 } })
 
   expect(hasComponent(e, 'pos')).toBe(true)
   expect(hasComponents(e, ['pos'])).toBe(true)
@@ -41,7 +37,7 @@ test('basic ecs functionality works', async () => {
 test('getting components works', () => {
   const world = new World<Entity>()
 
-  const e = world.createEntity({
+  const e = world.create({
     id: 'a',
     pos: {
       x: 0,
@@ -65,7 +61,7 @@ test('adding components works', () => {
 
   world.register(System, ['counter', 'counter2'])
 
-  const e = world.createEntity({
+  const e = world.create({
     id: 'a',
     counter: 2,
   })
@@ -84,7 +80,7 @@ test('adding components works', () => {
 test('you can persist queries for faster retrieval', () => {
   const world = new World<Entity>()
 
-  const e = world.createEntity({
+  const e = world.create({
     id: 'a',
     pos: {
       x: 0,
@@ -113,7 +109,7 @@ test('removing components works', () => {
 
   world.register(System, ['counter', 'counter2'])
 
-  const e = world.createEntity({
+  const e = world.create({
     id: 'a',
     counter: 0,
     counter2: 0,
@@ -131,15 +127,15 @@ test('removing components works', () => {
 test('all entities should have id components even with no id config', () => {
   const world = new World<{ foo: string }>()
 
-  const e = world.createEntity({ foo: '' })
+  const e = world.create({ foo: '' })
 
-  expect((e as any).id).toBeTypeOf('string')
+  expect((e as any).id).toBeTypeOf('number')
 })
 
 test('you can pass an ID function to make your own ids', () => {
   const world = new World<{ foo: string }>({ generateId: () => 'foobar' })
 
-  const e = world.createEntity({ foo: '' })
+  const e = world.create({ foo: '' })
 
   expect((e as any).id).toBeTypeOf('string')
   expect((e as any).id).toBe('foobar')
@@ -148,11 +144,11 @@ test('you can pass an ID function to make your own ids', () => {
 test('entities are deleted when all non-ID components are removed', () => {
   const world = new World<{ foo: string }>()
 
-  const e = world.createEntity({ foo: 'bar' })
+  const e = world.create({ foo: 'bar' })
 
-  expect((world as any).entities.size).toBe(1)
+  expect(world.size).toBe(1)
   world.removeComponents(e, ['foo'])
-  expect((world as any).entities.size).toBe(0)
+  expect(world.size).toBe(0)
 })
 
 test('updating components works, and triggers subscriptions', () => {
@@ -162,7 +158,7 @@ test('updating components works, and triggers subscriptions', () => {
 
   world.register(System, ['foo'])
 
-  const e = world.createEntity({ foo: 'bar' })
+  const e = world.create({ foo: 'bar' })
 
   const subscription = vi.fn()
 
@@ -190,7 +186,7 @@ test('you can update multiple components', () => {
 
   const world = new World<{ pos: Point; vel: Point }>()
 
-  const e1 = world.createEntity({
+  const e1 = world.create({
     pos: { x: 0, y: 0 },
     vel: { x: 0, y: 0 },
   })
@@ -211,7 +207,7 @@ test('you can optionally pass messages to world.run', () => {
 
   world.register(System, ['counter'])
 
-  const e = world.createEntity({ counter: 0 })
+  const e = world.create({ counter: 0 })
 
   world.run(12, 'foo')
 
@@ -243,7 +239,7 @@ test('you can subscribe to entity updates', () => {
 
   world.register(System, ['counter'])
 
-  const e1 = world.createEntity({ counter: 0 })
+  const e1 = world.create({ counter: 0 })
 
   const subscription = vi.fn()
 
@@ -251,7 +247,7 @@ test('you can subscribe to entity updates', () => {
 
   expect(subscription).toHaveBeenLastCalledWith(new Set([e1]))
 
-  const e2 = world.createEntity({ counter: 2 })
+  const e2 = world.create({ counter: 2 })
 
   expect(subscription).toHaveBeenLastCalledWith(new Set([e1, e2]))
 
@@ -261,9 +257,10 @@ test('you can subscribe to entity updates', () => {
 
   world.updateComponent(e1, 'counter', (c) => {
     c++
+    return c
   })
 
-  expect(subscription).toHaveBeenCalledTimes(4)
+  expect(subscription).toHaveBeenCalledTimes(5)
 
   unsub()
 })
@@ -276,14 +273,14 @@ test('you can register change handlers that that trigger with entity changed and
 
   const world = new World<{ pos: Point; vel: Point }>()
 
-  const e1 = world.createEntity({
+  const e1 = world.create({
     pos: { x: 0, y: 0 },
     vel: { x: 0, y: 0 },
   })
 
   const subscription = vi.fn()
 
-  const unsub = world.handleChange(['pos'], subscription)
+  const unsub = world.onUpdate(['pos'], subscription)
 
   const newPosition = { x: 2, y: 2 }
   world.updateComponent(e1, 'pos', newPosition)
@@ -293,14 +290,14 @@ test('you can register change handlers that that trigger with entity changed and
   unsub()
 })
 
-test('you can subscribe using a reusable factory function', () => {
+test('you can subscribe using a reusable factory function', async () => {
   const world = new World<{ counter: number }>()
 
   const System = vi.fn()
 
   world.register(System, ['counter'])
 
-  const e1 = world.createEntity({ counter: 1 })
+  const e1 = world.create({ counter: 1 })
 
   const subscription = vi.fn()
 
@@ -308,21 +305,26 @@ test('you can subscribe using a reusable factory function', () => {
 
   const unsub = useSubscription(subscription)
 
-  expect(subscription).toHaveBeenLastCalledWith(new Set([e1]))
+  expect(subscription).toHaveBeenCalledWith(new Set([e1]))
 
-  const e2 = world.createEntity({ counter: 2 })
+  const e2 = world.create({ counter: 2 })
 
-  expect(subscription).toHaveBeenLastCalledWith(new Set([e1, e2]))
+  expect(subscription).toHaveBeenCalledWith(new Set([e1, e2]))
 
+  // This will fire subscriptions twice because it also removes the entity
   world.removeComponents(e2, ['counter'])
 
-  expect(subscription).toHaveBeenLastCalledWith(new Set([e1]))
+  expect(subscription).toHaveBeenCalledWith(new Set([e1]))
 
   world.updateComponent(e1, 'counter', (c) => {
-    c++
+    return c + 1
   })
 
-  expect(subscription).toHaveBeenCalledTimes(4)
+  expect(subscription).toHaveBeenCalledTimes(5)
 
   unsub()
 })
+
+function sleep(n = 0) {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}

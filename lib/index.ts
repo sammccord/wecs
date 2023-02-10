@@ -1,7 +1,7 @@
 export type ID = number | string | bigint
 
 export type Component<E> = keyof E
-export type ComponentUpdater<T> = T | ((value: T) => T | void)
+export type ComponentUpdater<T> = T | ((value: T) => T)
 export type ComponentUpdaters<E, C extends keyof E> = [
   C,
   ComponentUpdater<E[C]>
@@ -14,14 +14,12 @@ export interface BaseEntity {
 
 export type EntitiesCallback<Entity> = (
   entities: Set<Entity>
-) => void | Promise<void> | (() => void)
-export type EntityCallback<Entity> = (
-  entity: Entity
-) => void | Promise<void> | (() => void)
+) => void | Promise<void>
+export type EntityCallback<Entity> = (entity: Entity) => void | Promise<void>
 export type EntityUpdateCallback<Entity> = (
   entity: Entity,
   updates?: ComponentUpdate<Entity, Component<Entity>>[]
-) => void | Promise<void> | (() => void)
+) => void | Promise<void>
 
 interface Query<Entity extends {} = any> {
   components: (keyof Entity)[]
@@ -68,8 +66,9 @@ export function hasComponents<Entity extends {} = any>(
   return components.every((c) => entity[c] !== undefined)
 }
 
+let _id = 0
 export function generateId() {
-  return crypto.randomUUID()
+  return (_id += 1)
 }
 
 export function makeQueryKey<Entity extends {} = any>(
@@ -87,8 +86,10 @@ export class World<Entity extends {} = any> {
     onBefore: () => undefined,
     onAfter: () => undefined,
   }
-  protected systems: [Function, string][] = []
+
   protected _entities: Map<ID, Entity> = new Map()
+
+  protected systems: [Function, Set<Entity>][] = []
   protected queries: Map<string, Query<Entity>> = new Map()
 
   protected _onCreate = new Set<EntityCallback<Entity>>()
@@ -106,8 +107,9 @@ export class World<Entity extends {} = any> {
   constructor(config?: Partial<Config<Entity>>) {
     this.config = { ...this.config, ...config }
 
-    this._onCreate.add(async (entity) => {
-      this.queries.forEach(async (query) => {
+    // React to creation and add to queries
+    this._onCreate.add((entity) => {
+      this.queries.forEach((query) => {
         if (query.exclude && hasSomeComponents(entity, query.exclude)) return
         if (hasComponents(entity, query.components)) {
           query.entities.add(entity)
@@ -118,13 +120,14 @@ export class World<Entity extends {} = any> {
       })
     })
 
-    this._onUpdate.add(async (entity) => {
-      this.queries.forEach(async (query) => {
+    // React to added/removed components and trigger subscriptions
+    this._onUpdate.add((entity) => {
+      this.queries.forEach((query) => {
         let executeSubs = false
         // should be removed?
         if (query.entities.has(entity)) {
+          executeSubs = true
           if (query.exclude && hasSomeComponents(entity, query.exclude)) {
-            executeSubs = true
             query.entities.delete(entity)
           }
         } else {
@@ -135,21 +138,31 @@ export class World<Entity extends {} = any> {
             query.entities.add(entity)
           }
         }
-        if (executeSubs) query.subscriptions.forEach((cb) => cb(query.entities))
+        if (executeSubs)
+          query.subscriptions.forEach(async (cb) => cb(query.entities))
       })
     })
 
-    this._onUpdate.add(async (entity, updates) => {
+    // React to individual entity updates
+    this._onUpdate.add((entity, updates) => {
       if (!updates) return
-      this.queries.forEach(async (query) => {
+      this.queries.forEach((query) => {
         query.updates.forEach(async (cb) => cb(entity, updates))
       })
     })
 
-    this._onRemove.add(async (entity) => {
-      this.queries.forEach(async (query) => {
-        if (query.entities.has(entity)) {
-          query.entities.delete(entity)
+    this._onUpdate.add((entity) => {
+      if (
+        Object.keys(entity).length === 0 ||
+        ((entity as any).id && Object.keys(entity).length === 1)
+      ) {
+        this.remove(entity)
+      }
+    })
+
+    this._onRemove.add((entity) => {
+      this.queries.forEach((query) => {
+        if (query.entities.delete(entity)) {
           query.subscriptions.forEach(async (sub) => {
             sub(query.entities)
           })
@@ -166,7 +179,9 @@ export class World<Entity extends {} = any> {
       persist?: Boolean
     } = {}
   ): Set<Entity> {
-    if (this.queries.has(key)) return this.queries.get(key)!.entities
+    const query = this.queries.get(key)
+    if (query) return query.entities
+
     const entities = new Set<Entity>()
     for (const entity of this._entities.values()) {
       if (opts.exclude && hasSomeComponents(entity, opts.exclude)) continue
@@ -188,27 +203,27 @@ export class World<Entity extends {} = any> {
     return this._entities.get(id)
   }
 
-  public add = this.createEntity.bind(this)
-  public createEntity(entity: Entity): Entity {
-    const id =
+  public add = this.create.bind(this)
+  public create(entity: Entity): Entity {
+    this._entities.set(
       this.config.getId(entity) ||
-      ((entity as any).id = this.config.generateId())
-    this._entities.set(id, entity)
+        ((entity as any).id = this.config.generateId()),
+      entity
+    )
     this._onCreate.forEach(async (cb) => cb(entity))
     return entity
   }
 
   public remove(entity: Entity): Entity {
-    this._handleRemoveCallbacks(entity, true)
+    this._handleRemoveCallbacks(entity)
     return entity
   }
 
   public clear() {
-    this._entities.clear()
     for (let query of this.queries.values()) {
       query.entities.clear()
     }
-    this.systems.length = 0
+    this._entities.clear()
   }
 
   public query(
@@ -226,14 +241,21 @@ export class World<Entity extends {} = any> {
     components: Component<Entity>[],
     exclude?: Component<Entity>[]
   ): void {
-    const key = makeQueryKey(components)
-    this.systems.push([system, key])
-    this.queryWithKey(key, components, { exclude, persist: true })
+    this.systems.push([
+      system,
+      this.queryWithKey(makeQueryKey(components), components, {
+        exclude,
+        persist: true,
+      }),
+    ])
   }
 
   public addComponents(entity: Entity, components: Partial<Entity>) {
     Object.assign(entity, components)
-    this._handleAddCallbacks(entity)
+    this._handleUpdateCallbacks(
+      entity,
+      Object.entries(components) as ComponentUpdate<Entity, keyof Entity>[]
+    )
   }
 
   public removeComponents(
@@ -241,25 +263,28 @@ export class World<Entity extends {} = any> {
     components: Component<Entity>[] = []
   ) {
     if (!components.length) return
-    for (let c of components) {
-      delete entity[c]
-    }
-    this._handleRemoveCallbacks(entity)
+    this._handleUpdateCallbacks(
+      entity,
+      components.map((c) => {
+        delete entity[c]
+        return [c, undefined]
+      }) as ComponentUpdate<Entity, keyof Entity>[]
+    )
   }
 
   public async run<Args extends readonly any[]>(...args: Args): Promise<void> {
     if (this.config.onBefore) await this.config.onBefore(...args)
     if (this.config.parallel) {
       await Promise.all(
-        this.systems.map(async ([system, key]) => {
-          if (args) await system(...args, this.queries.get(key)!.entities)
-          else await system(this.queries.get(key)!.entities)
+        this.systems.map(async ([system, entities]) => {
+          if (args) await system(...args, entities)
+          else await system(entities)
         })
       )
     } else {
-      for (let [system, key] of this.systems) {
-        if (args) system(...args, this.queries.get(key)!.entities)
-        else system(this.queries.get(key)!.entities)
+      for (let [system, entities] of this.systems) {
+        if (args) system(...args, entities)
+        else system(entities)
       }
     }
     if (this.config.onAfter) await this.config.onAfter(...args)
@@ -298,6 +323,21 @@ export class World<Entity extends {} = any> {
         query?.subscriptions.delete(callback)
       }
     }
+  }
+
+  public onEntityCreated(cb: EntityCallback<Entity>): () => void {
+    this._onCreate.add(cb)
+    return () => this._onCreate.delete(cb)
+  }
+
+  public onEntityUpdated(cb: EntityCallback<Entity>): () => void {
+    this._onUpdate.add(cb)
+    return () => this._onUpdate.delete(cb)
+  }
+
+  public onEntityRemoved(cb: EntityCallback<Entity>): () => void {
+    this._onRemove.add(cb)
+    return () => this._onRemove.delete(cb)
   }
 
   public onUpdate(
@@ -340,7 +380,7 @@ export class World<Entity extends {} = any> {
     }
   }
 
-  public unregisterHandler(
+  public unsubscribeUpdate(
     components: Component<Entity>[],
     callback: EntityUpdateCallback<Entity>
   ): void {
@@ -383,25 +423,11 @@ export class World<Entity extends {} = any> {
     component: T,
     update: ComponentUpdater<Entity[T]>
   ): Entity[T] {
-    return (entity[component] =
+    entity[component] =
       typeof update === 'function'
         ? (update as any)(entity[component]) || entity[component]
-        : update)
-  }
-
-  private _handleAddCallbacks(e: Entity) {
-    this._onUpdate.forEach(async (cb) => cb(e))
-  }
-
-  private _handleRemoveCallbacks(entity: Entity, force = false) {
-    this._onRemove.forEach(async (cb) => cb(entity))
-    if (
-      force ||
-      Object.keys(entity).length === 0 ||
-      ((entity as any).id && Object.keys(entity).length === 1)
-    ) {
-      this._entities.delete(this.config.getId(entity))
-    }
+        : update
+    return entity[component]
   }
 
   private _handleUpdates<C extends keyof Entity>(
@@ -409,14 +435,19 @@ export class World<Entity extends {} = any> {
     updates: ComponentUpdate<Entity, C>[]
   ) {
     if (this.config.asyncUpdates)
-      setTimeout(() => this._callUpdateHandlers(entity, updates), 0)
-    else this._callUpdateHandlers(entity, updates)
+      setTimeout(() => this._handleUpdateCallbacks(entity, updates), 0)
+    else this._handleUpdateCallbacks(entity, updates)
   }
 
-  private _callUpdateHandlers<C extends keyof Entity>(
-    entity: Entity,
-    updates: ComponentUpdate<Entity, C>[]
+  private _handleUpdateCallbacks(
+    e: Entity,
+    updates?: ComponentUpdate<Entity, keyof Entity>[]
   ) {
-    this._onUpdate.forEach(async (cb) => cb(entity, updates))
+    this._onUpdate.forEach(async (cb) => cb(e, updates))
+  }
+
+  private _handleRemoveCallbacks(entity: Entity) {
+    this._onRemove.forEach(async (cb) => cb(entity))
+    this._entities.delete(this.config.getId(entity))
   }
 }
