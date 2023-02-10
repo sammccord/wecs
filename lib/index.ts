@@ -184,9 +184,8 @@ export class World<Entity extends {} = any> {
     return entities
   }
 
-  public addComponents(entity: Entity, components: Partial<Entity>) {
-    Object.assign(entity, components)
-    this._handleAddCallbacks(entity)
+  public get(id: ID): Entity | undefined {
+    return this._entities.get(id)
   }
 
   public add = this.createEntity.bind(this)
@@ -202,10 +201,6 @@ export class World<Entity extends {} = any> {
   public remove(entity: Entity): Entity {
     this._handleRemoveCallbacks(entity, true)
     return entity
-  }
-
-  public get(id: ID): Entity | undefined {
-    return this._entities.get(id)
   }
 
   public clear() {
@@ -234,6 +229,11 @@ export class World<Entity extends {} = any> {
     const key = makeQueryKey(components)
     this.systems.push([system, key])
     this.queryWithKey(key, components, { exclude, persist: true })
+  }
+
+  public addComponents(entity: Entity, components: Partial<Entity>) {
+    Object.assign(entity, components)
+    this._handleAddCallbacks(entity)
   }
 
   public removeComponents(

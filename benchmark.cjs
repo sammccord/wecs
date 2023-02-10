@@ -53,6 +53,8 @@ profile('add', () => {
 
 profile('add (with archetypes)', () => {
   const world = new World({ parallel: true, asyncUpdates: true })
+  const withPosition = world.query(['position'], { persist: true })
+  const withVelocity = world.query(['velocity'], { persist: true })
 
   return () => {
     for (let i = 0; i < entityCount; i++) {
@@ -238,8 +240,8 @@ profile('simulate (for, array)', () => {
 
   return () => {
     let count = 0
-    const entities = world.entities
-    for (let i = 0; i < entities.length; i++) {
+    const entities = [...world.entities]
+    for (let i = 0; i < world.size; i++) {
       count++
       const { position, velocity } = entities[i]
       if (!velocity) continue
@@ -293,7 +295,7 @@ profile('value predicate check (filter 👎)', () => {
   return () => {
     let i = 0
 
-    for (const { position, velocity } of world.entities.filter(
+    for (const { position, velocity } of [...world.entities].filter(
       (e) => e.position.x > 0
     )) {
       i++
