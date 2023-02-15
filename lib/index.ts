@@ -1,5 +1,8 @@
 export type ID = number | string | bigint
 
+export type With<T, K extends keyof T> = Required<Pick<T, K>>
+export type Without<E, P extends keyof E> = Omit<E, P>
+
 export type Component<E> = keyof E
 export type ComponentUpdater<T> = T | ((value: T) => T)
 export type ComponentUpdaters<E, C extends keyof E> = [
@@ -19,12 +22,12 @@ export type EntityUpdateCallback<Entity> = (
   updates?: ComponentUpdate<Entity, Component<Entity>>[]
 ) => any
 
-interface Query<Entity extends {} = any> {
-  components: (keyof Entity)[]
-  exclude?: (keyof Entity)[]
-  entities: Set<Entity>
-  subscriptions: Set<EntitiesCallback<Entity>>
-  updates: Set<EntityUpdateCallback<Entity>>
+interface Query<Entity extends object, C extends keyof Entity> {
+  components: C[]
+  exclude?: C[]
+  entities: Set<With<Entity, C>>
+  subscriptions: Set<EntitiesCallback<With<Entity, C>>>
+  updates: Set<EntityUpdateCallback<With<Entity, C>>>
 }
 
 export interface Config<Entity> {
@@ -69,9 +72,10 @@ export function generateId() {
   return (_id += 1)
 }
 
-export function makeQueryKey<Entity extends {} = any>(
-  components: (keyof Entity)[]
-): string {
+export function makeQueryKey<
+  Entity extends object,
+  C extends Component<Entity>
+>(components: C[]): string {
   return components.sort().join()
 }
 
@@ -88,7 +92,7 @@ export class World<Entity extends {} = any> {
   protected _entities: Map<ID, Entity> = new Map()
 
   protected systems: [Function, Set<Entity>][] = []
-  protected queries: Map<string, Query<Entity>> = new Map()
+  protected queries: Map<string, Query<Entity, Component<Entity>>> = new Map()
 
   protected _onCreate = new Set<EntityCallback<Entity>>()
   protected _onUpdate = new Set<EntityUpdateCallback<Entity>>()
@@ -106,7 +110,7 @@ export class World<Entity extends {} = any> {
     this.config = { ...this.config, ...config }
 
     // React to creation and add to queries
-    this._onCreate.add((entity) => {
+    this._onCreate.add((entity: any) => {
       this.queries.forEach((query) => {
         if (query.exclude && hasSomeComponents(entity, query.exclude)) return
         if (hasComponents(entity, query.components)) {
@@ -123,17 +127,17 @@ export class World<Entity extends {} = any> {
       this.queries.forEach((query) => {
         let executeSubs = false
         // should be removed?
-        if (query.entities.has(entity)) {
+        if (query.entities.has(entity as any)) {
           executeSubs = true
           if (query.exclude && hasSomeComponents(entity, query.exclude)) {
-            query.entities.delete(entity)
+            query.entities.delete(entity as any)
           }
         } else {
           // should be added?
           if (query.exclude && hasSomeComponents(entity, query.exclude)) {
           } else if (hasComponents(entity, query.components)) {
             executeSubs = true
-            query.entities.add(entity)
+            query.entities.add(entity as any)
           }
         }
         if (executeSubs)
@@ -145,7 +149,7 @@ export class World<Entity extends {} = any> {
     this._onUpdate.add((entity, updates) => {
       if (!updates) return
       this.queries.forEach((query) => {
-        query.updates.forEach(async (cb) => cb(entity, updates))
+        query.updates.forEach(async (cb) => cb(entity as any, updates))
       })
     })
 
@@ -160,7 +164,7 @@ export class World<Entity extends {} = any> {
 
     this._onRemove.add((entity) => {
       this.queries.forEach((query) => {
-        if (query.entities.delete(entity)) {
+        if (query.entities.delete(entity as any)) {
           query.subscriptions.forEach(async (sub) => {
             sub(query.entities)
           })
@@ -169,14 +173,14 @@ export class World<Entity extends {} = any> {
     })
   }
 
-  protected queryWithKey(
+  protected queryWithKey<C extends Component<Entity>>(
     key: string,
-    components: Component<Entity>[],
+    components: C[],
     opts: {
-      exclude?: Component<Entity>[]
+      exclude?: C[]
       persist?: Boolean
     } = {}
-  ): Set<Entity> {
+  ): Set<With<Entity, C>> {
     const query = this.queries.get(key)
     if (query) return query.entities
 
@@ -188,17 +192,19 @@ export class World<Entity extends {} = any> {
     if (opts.persist)
       this.queries.set(key, {
         components,
-        entities,
+        entities: entities as Set<Required<Pick<Entity, keyof Entity>>>,
         exclude: opts.exclude,
         subscriptions: new Set(),
         updates: new Set(),
       })
 
-    return entities
+    return entities as unknown as Set<Required<Pick<Entity, C>>>
   }
 
-  public get(id: ID): Entity | undefined {
-    return this._entities.get(id)
+  public get<C extends Component<Entity> = any>(
+    id: ID
+  ): With<Entity, C> | undefined {
+    return this._entities.get(id) as any as With<Entity, C>
   }
 
   public add = this.create.bind(this)
@@ -224,24 +230,28 @@ export class World<Entity extends {} = any> {
     this._entities.clear()
   }
 
-  public query(
-    components: Component<Entity>[],
+  public query<C extends Component<Entity>>(
+    components: C[],
     opts: {
       exclude?: Component<Entity>[]
       persist?: Boolean
     } = {}
-  ): Set<Entity> {
-    return this.queryWithKey(makeQueryKey(components), components, opts)
+  ): Set<With<Entity, C>> {
+    return this.queryWithKey(
+      makeQueryKey<Entity, C>(components),
+      components,
+      opts
+    )
   }
 
-  public register(
+  public register<C extends Component<Entity>>(
     system: Function,
-    components: Component<Entity>[],
+    components: C[],
     exclude?: Component<Entity>[]
   ): void {
     this.systems.push([
       system,
-      this.queryWithKey(makeQueryKey(components), components, {
+      this.queryWithKey(makeQueryKey<Entity, C>(components), components, {
         exclude,
         persist: true,
       }),
@@ -252,13 +262,13 @@ export class World<Entity extends {} = any> {
     Object.assign(entity, components)
     this._handleUpdateCallbacks(
       entity,
-      Object.entries(components) as ComponentUpdate<Entity, keyof Entity>[]
+      Object.entries(components) as ComponentUpdate<Entity, Component<Entity>>[]
     )
   }
 
-  public removeComponents(
+  public removeComponents<C extends Component<Entity>>(
     entity: Entity,
-    components: Component<Entity>[] = []
+    components: C[] = []
   ) {
     if (!components.length) return
     this._handleUpdateCallbacks(
@@ -266,7 +276,7 @@ export class World<Entity extends {} = any> {
       components.map((c) => {
         delete entity[c]
         return [c, undefined]
-      }) as ComponentUpdate<Entity, keyof Entity>[]
+      }) as ComponentUpdate<Entity, C>[]
     )
   }
 
@@ -288,19 +298,19 @@ export class World<Entity extends {} = any> {
     if (this.config.onAfter) await this.config.onAfter(...args)
   }
 
-  public subscribe(
-    components: Component<Entity>[],
-    callback: EntitiesCallback<Entity>,
+  public subscribe<C extends Component<Entity>>(
+    components: C[],
+    callback: EntitiesCallback<With<Entity, C>>,
     opts: { emit?: boolean; exclude?: Component<Entity>[] } = {}
   ): () => void {
     return this.makeSubscription(components, opts)(callback)
   }
 
-  public makeSubscription(
-    components: Component<Entity>[],
+  public makeSubscription<C extends Component<Entity>>(
+    components: C[],
     opts: { emit?: boolean; exclude?: Component<Entity>[] } = {}
-  ): (cb: EntitiesCallback<Entity>) => () => void {
-    const key = makeQueryKey(components)
+  ): (cb: EntitiesCallback<With<Entity, C>>) => () => void {
+    const key = makeQueryKey<Entity, C>(components)
     return (callback) => {
       let query = this.queries.get(key)
       if (query) {
@@ -308,7 +318,7 @@ export class World<Entity extends {} = any> {
       } else {
         query = {
           components,
-          entities: this.queryWithKey(key, components),
+          entities: this.queryWithKey(key, components) as any,
           subscriptions: new Set([callback]),
           updates: new Set(),
         }
@@ -324,65 +334,65 @@ export class World<Entity extends {} = any> {
   }
 
   public onEntityCreated(cb: EntityCallback<Entity>): () => void {
-    this._onCreate.add(cb)
-    return () => this._onCreate.delete(cb)
+    this._onCreate.add(cb as any)
+    return () => this._onCreate.delete(cb as any)
   }
 
   public onEntityUpdated(cb: EntityCallback<Entity>): () => void {
-    this._onUpdate.add(cb)
-    return () => this._onUpdate.delete(cb)
+    this._onUpdate.add(cb as any)
+    return () => this._onUpdate.delete(cb as any)
   }
 
   public onEntityRemoved(cb: EntityCallback<Entity>): () => void {
-    this._onRemove.add(cb)
-    return () => this._onRemove.delete(cb)
+    this._onRemove.add(cb as any)
+    return () => this._onRemove.delete(cb as any)
   }
 
-  public onUpdate(
-    components: Component<Entity>[],
-    callback: EntityUpdateCallback<Entity>
+  public onUpdate<C extends Component<Entity>>(
+    components: C[],
+    cb: EntityUpdateCallback<With<Entity, C>>
   ): () => void {
-    return this.makeUpdateHandler(components)(callback)
+    return this.makeUpdateHandler(components)(cb as any)
   }
 
-  public makeUpdateHandler(
-    components: Component<Entity>[]
-  ): (cb: EntityUpdateCallback<Entity>) => () => void {
-    const key = makeQueryKey(components)
+  public makeUpdateHandler<C extends Component<Entity>>(
+    components: C[]
+  ): (cb: EntityUpdateCallback<With<Entity, C>>) => () => void {
+    const key = makeQueryKey<Entity, C>(components)
     return (callback) => {
-      let query = this.queries.get(key)
+      let query = this.queries.get(key) as any as Query<Entity, C>
       if (query) {
-        query.updates.add(callback)
+        query.updates.add(callback as any)
       } else {
         query = {
           components,
-          entities: this.queryWithKey(key, components),
+          entities: this.queryWithKey(key, components) as any,
           subscriptions: new Set(),
           updates: new Set([callback]),
-        }
-        this.queries.set(key, query)
+        } as Query<Entity, C>
+        this.queries.set(key, query as any)
       }
       return () => {
-        query?.updates.delete(callback)
+        query?.updates.delete(callback as any)
       }
     }
   }
 
-  public unsubscribe(
-    components: Component<Entity>[],
-    callback: EntitiesCallback<Entity>
+  public unsubscribe<C extends Component<Entity>>(
+    components: C[],
+    callback: EntitiesCallback<With<Entity, C>>
   ): void {
-    const key = makeQueryKey(components)
-    if (this.queries.has(key)) {
-      this.queries.get(key)!.subscriptions.delete(callback)
-    }
+    const key = makeQueryKey<Entity, C>(components)
+    this.queries.get(key)?.subscriptions.delete(callback)
   }
 
-  public unsubscribeUpdate(
-    components: Component<Entity>[],
-    callback: EntityUpdateCallback<Entity>
+  public unsubscribeUpdate<C extends Component<Entity>>(
+    components: C[],
+    callback: EntityUpdateCallback<With<Entity, C>>
   ): void {
-    this.queries.get(makeQueryKey(components))?.updates.delete(callback)
+    this.queries
+      .get(makeQueryKey<Entity, C>(components))
+      ?.updates.delete(callback as any)
   }
 
   public update(entity: Entity, components: Partial<Entity>): Entity {
@@ -394,11 +404,11 @@ export class World<Entity extends {} = any> {
     return entity
   }
 
-  public updateComponent<T extends Component<Entity>>(
+  public updateComponent<C extends Component<Entity>>(
     entity: Entity,
-    component: T,
-    update: ComponentUpdater<Entity[T]>
-  ): Entity[T] {
+    component: C,
+    update: ComponentUpdater<Entity[C]>
+  ): Entity[C] {
     const _update = this._update(entity, component, update)
     this._handleUpdates(entity, [[component, _update]])
     return _update
@@ -416,11 +426,11 @@ export class World<Entity extends {} = any> {
     return _updates
   }
 
-  private _update<T extends Component<Entity>>(
+  private _update<C extends Component<Entity>>(
     entity: Entity,
-    component: T,
-    update: ComponentUpdater<Entity[T]>
-  ): Entity[T] {
+    component: C,
+    update: ComponentUpdater<Entity[C]>
+  ): Entity[C] {
     entity[component] =
       typeof update === 'function'
         ? (update as any)(entity[component]) || entity[component]

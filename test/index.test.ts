@@ -96,7 +96,7 @@ test('removing components works', () => {
   interface Counter {
     id: string
     counter: number
-    counter2: number
+    counter2?: number
   }
 
   const world = new World<Counter>()
