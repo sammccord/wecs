@@ -12,14 +12,12 @@ export interface BaseEntity {
   id: ID | undefined
 }
 
-export type EntitiesCallback<Entity> = (
-  entities: Set<Entity>
-) => void | Promise<void>
-export type EntityCallback<Entity> = (entity: Entity) => void | Promise<void>
+export type EntitiesCallback<Entity> = (entities: Set<Entity>) => any
+export type EntityCallback<Entity> = (entity: Entity) => any
 export type EntityUpdateCallback<Entity> = (
   entity: Entity,
   updates?: ComponentUpdate<Entity, Component<Entity>>[]
-) => void | Promise<void>
+) => any
 
 interface Query<Entity extends {} = any> {
   components: (keyof Entity)[]

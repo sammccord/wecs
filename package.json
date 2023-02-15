@@ -1,6 +1,6 @@
 {
   "name": "wecs",
-  "version": "8.0.0-alpha.1",
+  "version": "8.0.0-alpha.2",
   "license": "MIT",
   "type": "module",
   "module": "./dist/index.js",
